@@ -122,6 +122,12 @@ support today):**
 - MTM eligibility check (REFERRAL_NETWORK.md) - fully computable from data
   already in `user_matching_profile`/`user_medications`, no external API,
   buildable alongside the rest of Phase 1
+- Conversational entity extraction (CONVERSATIONAL_ENTITY_EXTRACTION.md) -
+  broaden `extractIntent()`'s schema (employer, institution, plan name,
+  prescriber, location), merge every extracted fact into the durable
+  profile immediately (never-ask-twice, with the
+  don't-silently-overwrite rule), and add the "check before asking" hard
+  rule to chat_system_prompt.md
 
 **Phase 1.5 - parallel track, not sequential after Phase 1:**
 - Bill auditor, denial appeals, charity care screening - document-in,
