@@ -109,10 +109,10 @@ support today):**
 - Auth (Supabase email/magic-link)
 - Chat-first onboarding per CRISIS_AWARE_DESIGN.md/UI_UX.md - case list as
   home screen, not a profile wall
-- Wire `app/api/chat/route.ts`: point `callModel()` at the model router
-  (decided 2026-07-24: shares the MIST project's OpenRouter setup - get
-  the config from Ryan, it is not in this repo), point `loadSystemPrompt()`
-  at `chat_system_prompt.md`
+- Wire `app/api/chat/route.ts`: `callModel()` routes via OpenRouter
+  direct (decided 2026-07-24, superseding the MIST dependency - see
+  Decisions locked), point `loadSystemPrompt()` at
+  `chat_system_prompt.md`
 - Seed `drugs`/`price_points` from `seed_drugs.json` (figures from 2026
   reporting - create the `sources` rows for them during the load; verify
   against current sources before production use)
@@ -171,8 +171,13 @@ support today):**
 
 ## Decisions locked (2026-07-24)
 
-- **Model router**: `callModel()` shares the MIST project's OpenRouter
-  setup. The config/credentials live with Ryan, not in this repo.
+- **Model router**: OpenRouter direct, two tiers (lib/modelConfig.ts):
+  `anthropic/claude-haiku-4.5:floor` for extraction,
+  `anthropic/claude-sonnet-4.6:floor` for response. `:floor` = cheapest
+  provider; `max_price` caps are sent with every call and failures throw -
+  no silent fallback to a premium provider. This supersedes the earlier
+  "share the MIST project's OpenRouter setup" decision (never landed in
+  the repo; replaced same-day).
 - **Identity encryption**: pgcrypto at the application layer, per
   SECURITY.md. No external vault for the pilot; revisit if volume
   justifies it.

@@ -66,8 +66,11 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 
 ## Locked decisions (2026-07-24)
 
-- Model router: shares the MIST project's OpenRouter setup — config lives
-  with the user, not in this repo; ask for it when wiring `callModel()`.
+- Model router: OpenRouter direct (no MIST dependency — that decision
+  never landed and was replaced same-day). `lib/modelConfig.ts` maps
+  tiers → slugs with max_price caps: `anthropic/claude-haiku-4.5:floor`
+  (extraction), `anthropic/claude-sonnet-4.6:floor` (response). Calls
+  fail loud, never silently upgrade. Needs `OPENROUTER_API_KEY`.
 - Identity encryption: pgcrypto at the application layer (no external vault).
 - MTM cost threshold: $1,276 for 2026, verified against CMS CY2026 MTM
   memo; re-verify annually. Plans may set lower thresholds — present as
