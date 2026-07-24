@@ -131,6 +131,16 @@ support today):**
 - Guided document capture (GUIDED_DOCUMENT_SCANNING.md) - camera-first
   guided flow with client-side quality checks; captured photos go
   straight to the extraction tier (it accepts images), no OCR service
+- Multi-format intake (MULTI_FORMAT_UPLOAD.md) - PDF/image upload beside
+  the camera flow; native-PDF text extraction first, vision model only
+  as fallback; HEIC converted on upload; `source_format` on
+  `uploaded_documents` is additive
+- Data retention automation (DATA_RETENTION.md) - scheduled deletion,
+  not just delete-on-request: raw uploads expire hours after extraction,
+  case data 90 days post-`resolved_at`, extended-retention opt-in for
+  caregivers. Needs `resolved_at` on `cases`, an expiry field on
+  `uploaded_documents`, and a consent-ledger table (SECURITY.md does not
+  currently define one - gap, see Known open items)
 
 **Phase 2:**
 - Export/print/translation (EXPORT_AND_TRANSLATION.md)
@@ -206,6 +216,15 @@ support today):**
 - `employer_plans.extracted_plan_facts` must be scrubbed of any
   contributing uploader's identity before being cached - this is an
   extraction-pipeline requirement, not just a schema comment
+- **Consent ledger gap**: DATA_RETENTION.md twice cites "the consent
+  ledger already required by SECURITY.md" - SECURITY.md defines no such
+  thing, and no `consent_ledger` table exists. Treat as an intended new
+  requirement: add the table (opt-in/opt-out choices with timestamps,
+  per category) plus the requirement line to SECURITY.md when the Phase
+  1.5 retention increment lands.
+- Scheduled deletion: pg_cron 1.6.4 and pg_net 0.20.4 are AVAILABLE on
+  the Arik project (checked 2026-07-24, not yet installed) - the
+  retention job can live Supabase-side with no external scheduler.
 - EXCEPTION_INTELLIGENCE_ENGINE.md is referenced for Phase 3 work but is
   still not in the repo - restore or draft it before that phase starts
   (schema already reflects its decisions; PHARMACIST_AND_REVCYCLE_FORMATS.md
