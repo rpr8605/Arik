@@ -47,6 +47,16 @@ just in the chat turn where they first came up:
 - When exactly one thing blocks full automation, the UI asks for that one
   thing - never a generic "tell me more."
 
+## Document capture (camera-first)
+
+Bills, EOBs, and denial letters arrive as paper. From within a case, "Add
+a document" opens a guided camera flow - not a bare file picker - with an
+on-screen guide rectangle and live quality checks (blur, glare, framing)
+before the capture is accepted, then an "add another page?" loop for
+multi-page documents. Captured pages land in the case's
+`uploaded_documents`, queued for extraction. GUIDED_DOCUMENT_SCANNING.md
+is the detailed implementation spec for this principle (Phase 1.5 track).
+
 ## Sharing and caregiver surfaces (per CAREGIVER_MODE.md)
 
 - Reviewer sharing creates an expiring, revocable link; the share sheet

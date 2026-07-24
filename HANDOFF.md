@@ -128,6 +128,9 @@ support today):**
   findings-out, no live monitor job needed
 - Document reconciliation (CASE_MODEL.md) - cross-referencing multiple
   uploaded documents per case, not processing each independently
+- Guided document capture (GUIDED_DOCUMENT_SCANNING.md) - camera-first
+  guided flow with client-side quality checks; captured photos go
+  straight to the extraction tier (it accepts images), no OCR service
 
 **Phase 2:**
 - Export/print/translation (EXPORT_AND_TRANSLATION.md)
