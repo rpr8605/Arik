@@ -51,11 +51,15 @@ exist yet; building it is the task.
 SCENARIOS.md walks through example chat exchanges matching BEHAVIOR.md's
 rules, including the clinical-boundary case. METHODOLOGY.md is the source
 taxonomy and evidence-grading system referenced by every data table.
-ACCESSIBILITY.md covers the WCAG/voice-input approach for the frontend.
-UI_UX.md is the surface-level spec (case list home, trust receipt
-placement, Tier 2 confirm pattern). AGENTS.md holds OpenCode-specific
-working instructions. None of these define database tables, but read them
-before building the corresponding feature.
+ACCESSIBILITY.md covers the WCAG/voice-input approach for the frontend;
+UNIVERSAL_ACCESS.md is the cross-cutting access principle above it
+(full-conversation language preference, cognitive/neurodivergent design,
+elderly-first defaults - its one schema need is a
+`user_matching_profile.preferred_language` field, additive). UI_UX.md is
+the surface-level spec (case list home, trust receipt placement, Tier 2
+confirm pattern). AGENTS.md holds OpenCode-specific working instructions.
+None of these define database tables, but read them before building the
+corresponding feature.
 
 ## What's actually in schema.sql (27 tables)
 
