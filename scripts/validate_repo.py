@@ -213,6 +213,28 @@ def check_docs_reference_real_tables(schema_table_names):
             )
 
 
+def check_md_file_references():
+    print("\n--- Checking .md docs for referenced .md files that don't exist ---")
+    existing = {p.name for p in REPO_ROOT.glob("*.md")}
+    problems = 0
+    for md_path in REPO_ROOT.glob("*.md"):
+        text = md_path.read_text()
+        # Any Something_Like_This.md (or chat_system_prompt.md) mention must
+        # point at a file that actually exists at the repo root - dangling
+        # doc references are how spec drift hides.
+        refs = set(re.findall(r"\b([A-Za-z][A-Za-z0-9_]*)\.md\b", text))
+        for ref in sorted(refs):
+            fname = f"{ref}.md"
+            if fname not in existing:
+                fail(
+                    f"{md_path.name} references {fname} but that file does "
+                    f"not exist in the repo"
+                )
+                problems += 1
+    if problems == 0:
+        ok(f"all .md file references resolve ({len(existing)} files present)")
+
+
 def check_handoff_lists_all_files():
     print("\n--- Checking HANDOFF.md references every file in the repo ---")
     handoff_path = REPO_ROOT / "HANDOFF.md"
@@ -236,6 +258,7 @@ def main():
     table_names = check_schema_sql()
     check_route_ts_against_schema(table_names)
     check_docs_reference_real_tables(table_names)
+    check_md_file_references()
     check_handoff_lists_all_files()
 
     print("\n" + "=" * 60)

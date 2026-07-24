@@ -41,5 +41,11 @@ export async function callModel(opts: {
   if (typeof text !== 'string' || text.length === 0) {
     throw new Error(`OpenRouter ${opts.tier} returned no content`);
   }
+  // One-line usage record per call - shows up in dev server logs and is
+  // what the smoke test reads for real per-call cost accounting.
+  console.log(
+    `[callModel] tier=${opts.tier} model=${json.model ?? spec.slug} ` +
+      `tokens=${json?.usage?.prompt_tokens ?? '?'}/${json?.usage?.completion_tokens ?? '?'}`,
+  );
   return text;
 }

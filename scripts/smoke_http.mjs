@@ -1,0 +1,104 @@
+// End-to-end HTTP smoke against the dev server + live DB.
+// Creates a fixture user, exercises the case workflow (incl. illegal
+// transitions -> 409), the deadline engine (rule match + honest no_rule),
+// and the identity vault (masked reads only), then privacy-deletes
+// everything it created. Usage: node scripts/smoke_http.mjs
+import { readFileSync } from 'node:fs';
+import pg from 'pg';
+
+function loadEnv(path) {
+  const out = {};
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/i);
+    if (!m || m[1].startsWith('#')) continue;
+    out[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+  return out;
+}
+const env = loadEnv(new URL('../.env.local', import.meta.url));
+const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
+const USER = '33333333-3333-3333-3333-333333333333';
+
+const pgClient = new pg.Client({
+  host: env.SUPABASE_DB_HOST, port: 5432, user: 'postgres',
+  password: env.SUPABASE_DB_PASSWORD, database: 'postgres',
+  ssl: { rejectUnauthorized: false },
+});
+
+let failures = 0;
+function check(name, cond, detail = '') {
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? ' - ' + detail : ''}`);
+  if (!cond) failures++;
+}
+async function api(method, path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let json = null;
+  try { json = await res.json(); } catch { /* empty body */ }
+  return { status: res.status, json };
+}
+
+await pgClient.connect();
+await pgClient.query(
+  `insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
+                           email_confirmed_at, created_at, updated_at,
+                           raw_app_meta_data, raw_user_meta_data)
+   values ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+           'http_smoke@example.invalid', crypt('smoke', gen_salt('bf')), now(), now(), now(), '{}', '{}')
+   on conflict (id) do nothing`,
+  [USER],
+);
+console.log(`smoke target: ${BASE}\n`);
+
+// 1. Create a case
+const created = await api('POST', '/api/cases', { userId: USER, caseType: 'prescription_savings' });
+check('POST /api/cases creates case', created.status === 201 && created.json?.case?.status === 'gathering_evidence', `status ${created.status}`);
+const caseId = created.json?.case?.id;
+
+// 2. Illegal transition -> 409
+const illegal = await api('PATCH', `/api/cases/${caseId}`, { to: 'resolved_won' });
+check('PATCH gathering_evidence -> resolved_won returns 409', illegal.status === 409, `status ${illegal.status}`);
+
+// 3. Legal transition -> 200
+const legal = await api('PATCH', `/api/cases/${caseId}`, { to: 'action_ready' });
+check('PATCH gathering_evidence -> action_ready returns 200', legal.status === 200 && legal.json?.case?.status === 'action_ready', `status ${legal.status}`);
+
+// 4. Deadline with a known payer rule -> stored with countdown
+const dl = await api('POST', `/api/cases/${caseId}/deadlines`, { noticeDate: '2026-07-01', payerName: 'UHC', planType: 'employer' });
+check('POST deadlines (UHC) stores deadline with days_remaining', dl.status === 201 && dl.json?.stored === true && typeof dl.json?.daysRemaining === 'number',
+  dl.json?.stored ? `filing ${dl.json?.deadline?.filing_deadline}, ${dl.json?.daysRemaining}d remaining, basis: ${(dl.json?.basis ?? '').slice(0, 60)}...` : JSON.stringify(dl.json));
+check('UHC deadline is flagged sourceUnverified (honest basis)', dl.json?.sourceUnverified === true);
+
+// 5. Unknown payer -> honest no_rule, NOT a guessed deadline
+const noRule = await api('POST', `/api/cases/${caseId}/deadlines`, { noticeDate: '2026-07-01', payerName: 'Acme Unknown Mutual', planType: 'medicaid' });
+check('POST deadlines (unknown payer) returns no_rule, nothing stored', noRule.status === 200 && noRule.json?.stored === false && noRule.json?.reason === 'no_rule');
+
+// 6. Only the one real deadline is listed
+const list = await api('GET', `/api/cases/${caseId}/deadlines`);
+check('GET deadlines lists exactly the 1 stored deadline', list.status === 200 && (list.json?.deadlines ?? []).length === 1, `${(list.json?.deadlines ?? []).length} row(s)`);
+
+// 7. Identity write -> masked read (booleans, never values)
+const put = await api('PUT', '/api/identity', { userId: USER, fields: { full_name: 'Http Smoke', insurance_member_id: 'XYZ-123' } });
+check('PUT /api/identity saves + returns masked fields', put.status === 200 && put.json?.identity?.full_name === true && put.json?.identity?.email === false);
+const getId = await api('GET', `/api/identity?userId=${USER}`);
+check('GET /api/identity never returns plaintext values', getId.status === 200 && !JSON.stringify(getId.json).includes('Http Smoke') && !JSON.stringify(getId.json).includes('XYZ-123'));
+
+// 8. Terminal state: close, then confirm reopening is illegal
+await api('PATCH', `/api/cases/${caseId}`, { to: 'submitted' });
+await api('PATCH', `/api/cases/${caseId}`, { to: 'closed_by_patient' });
+const reopen = await api('PATCH', `/api/cases/${caseId}`, { to: 'gathering_evidence' });
+check('PATCH closed_by_patient -> gathering_evidence returns 409 (terminal)', reopen.status === 409, `status ${reopen.status}`);
+
+// 9. Privacy deletion removes everything the user touched
+const del = await api('DELETE', `/api/privacy?userId=${USER}`);
+const deletedTotal = Object.values(del.json?.deleted ?? {}).reduce((a, b) => a + b, 0);
+check('DELETE /api/privacy removes user data', del.status === 200 && deletedTotal >= 3, `deleted: ${JSON.stringify(del.json?.deleted)}`);
+
+await pgClient.query(`delete from auth.users where id = $1`, [USER]);
+await pgClient.end();
+
+console.log(failures === 0 ? '\nHTTP SMOKE: ALL PASS' : `\nHTTP SMOKE: ${failures} FAILURE(S)`);
+process.exit(failures === 0 ? 0 : 1);

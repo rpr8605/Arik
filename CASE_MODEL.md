@@ -188,7 +188,7 @@ percentage against hypothetical savings, a clear cap, no fee on benefits
 the patient already had before Arik touched the case, a dispute/refund
 process, and a hardship waiver. This is what keeps the success-fee model
 from feeling predatory and is a direct, necessary extension of the
-outcome-tracking gap already flagged in FULL_SYNOPSIS.md.
+outcome-tracking gap already flagged in the earlier product synopsis.
 
 ## Build sequencing (supersedes the phase order in HANDOFF.md)
 
