@@ -1,0 +1,92 @@
+{
+  "_note": "Phase 1 seed. IRA-negotiated drugs are the cleanest starting wedge - documented list price and documented negotiated price, both citable, no AI judgment call needed to prove the model. Common generics are the second wedge (cash-price arbitrage angle). Verify all figures against current source before production use; these are drawn from 2026 reporting and negotiated prices are point-in-time.",
+  "ira_negotiated_2026": [
+    {
+      "name": "Januvia",
+      "manufacturer": "Merck",
+      "drug_class": "diabetes (DPP-4 inhibitor)",
+      "list_price_2023_30day": 527,
+      "negotiated_price_2026_30day": 113,
+      "pct_reduction": 79,
+      "exploit_angle": "patients still on list-price plans or unaware of negotiated price should confirm their plan is passing through the negotiated rate"
+    },
+    {
+      "name": "Fiasp / NovoLog (insulin)",
+      "manufacturer": "Novo Nordisk",
+      "drug_class": "insulin",
+      "list_price_2023_30day": 495,
+      "negotiated_price_2026_30day": 119,
+      "pct_reduction": 76,
+      "exploit_angle": "insulin also has separate $35/month Medicare Part D cap - stack against negotiated price to confirm patient is getting the lower of the two"
+    },
+    {
+      "name": "Farxiga",
+      "manufacturer": "AstraZeneca",
+      "drug_class": "diabetes/heart failure/CKD (SGLT2 inhibitor)",
+      "list_price_2023_30day": 556,
+      "negotiated_price_2026_30day": 178.50,
+      "pct_reduction": 68
+    },
+    {
+      "name": "Jardiance",
+      "manufacturer": "Boehringer Ingelheim / Lilly",
+      "drug_class": "diabetes/heart failure/CKD (SGLT2 inhibitor)",
+      "list_price_2023_30day": 573,
+      "negotiated_price_2026_30day": 197,
+      "pct_reduction": 66
+    },
+    {
+      "name": "Enbrel",
+      "manufacturer": "Immunex/Amgen",
+      "drug_class": "rheumatoid arthritis / psoriasis biologic",
+      "list_price_2023_30day": 7106,
+      "negotiated_price_2026_30day": 2355,
+      "pct_reduction": 67
+    },
+    {
+      "name": "Stelara",
+      "manufacturer": "Janssen",
+      "drug_class": "psoriasis/Crohn's/UC biologic",
+      "list_price_2023_30day": 13836,
+      "negotiated_price_2026_30day": 4695,
+      "pct_reduction": 66
+    },
+    {
+      "name": "Xarelto",
+      "manufacturer": "Janssen",
+      "drug_class": "anticoagulant",
+      "list_price_2023_30day": 517,
+      "negotiated_price_2026_30day": 197,
+      "pct_reduction": 62
+    },
+    {
+      "name": "Eliquis",
+      "manufacturer": "Bristol Myers Squibb / Pfizer",
+      "drug_class": "anticoagulant",
+      "list_price_2023_30day": 521,
+      "negotiated_price_2026_30day": 231,
+      "pct_reduction": 56,
+      "note": "one of the highest-volume Part D drugs by claim count, ~4M beneficiaries"
+    },
+    {
+      "name": "Entresto",
+      "manufacturer": "Novartis",
+      "drug_class": "chronic heart failure",
+      "list_price_2023_30day": 628,
+      "negotiated_price_2026_30day": 295,
+      "pct_reduction": 53
+    }
+  ],
+  "high_volume_generics_watchlist": [
+    { "name": "atorvastatin", "brand": "Lipitor", "drug_class": "statin", "note": "single most-prescribed drug in Medicare by claim volume; cash price for generic often beats insurance copay at certain pharmacies" },
+    { "name": "lisinopril", "drug_class": "ACE inhibitor / blood pressure" },
+    { "name": "amlodipine", "drug_class": "calcium channel blocker / blood pressure" },
+    { "name": "losartan", "drug_class": "ARB / blood pressure" },
+    { "name": "metoprolol", "drug_class": "beta blocker / blood pressure" },
+    { "name": "rosuvastatin", "brand": "Crestor", "drug_class": "statin" }
+  ],
+  "2026_price_hike_watchlist": [
+    { "manufacturer": "Pfizer", "drugs": ["Ibrance", "Nurtec", "Paxlovid"], "note": "~80 Pfizer drugs saw list price hikes in 2026, median around 4%; hospital-administered drugs like morphine/hydromorphone saw some of the steepest increases (4x+ on certain formulations)" },
+    { "note": "350+ branded medications had planned list price increases for 2026 per 3 Axis Advisors data; these are prime candidates for the monitor job once built, since a rising list price often means the cash-vs-insurance-vs-card arbitrage gap is widening too" }
+  ]
+}
