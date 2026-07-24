@@ -1,10 +1,52 @@
-export default function Home() {
-  // Phase 1: this becomes the case list (UI_UX.md - home = case list, not a
-  // profile wall). Placeholder while core infrastructure is built.
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { listCases } from '@/lib/cases';
+import { NewCaseForm } from './NewCaseForm';
+
+// Home = case list, not a profile wall (UI_UX.md, CRISIS_AWARE_DESIGN.md).
+export default async function Home() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: () => {},
+      },
+    },
+  );
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const cases = await listCases(user.id);
+
   return (
     <main>
-      <h1>Arik</h1>
-      <p>Core infrastructure pass - case list lands here in Phase 1.</p>
+      <h1>What&apos;s going on?</h1>
+      <NewCaseForm />
+
+      <h2>Your cases</h2>
+      {cases.length === 0 ? (
+        <p>No cases yet. Tell me what happened above and I&apos;ll take it from there.</p>
+      ) : (
+        <ul>
+          {cases.map((c) => (
+            <li key={c.id}>
+              <Link href={`/cases/${c.id}`}>
+                <strong>{c.case_type.replaceAll('_', ' ')}</strong> — {c.status.replaceAll('_', ' ')}
+                {c.next_action ? ` — next: ${c.next_action}` : ''}
+                {c.next_action_due ? ` (due ${c.next_action_due})` : ''}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </main>
   );
 }

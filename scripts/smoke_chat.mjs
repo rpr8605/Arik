@@ -5,6 +5,7 @@
 // (dev server must be running on BASE_URL)
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
 function loadEnv(path) {
   const out = {};
@@ -17,7 +18,6 @@ function loadEnv(path) {
 }
 const env = loadEnv(new URL('../.env.local', import.meta.url));
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
-const USER = '44444444-4444-4444-4444-444444444444';
 
 const pgClient = new pg.Client({
   host: env.SUPABASE_DB_HOST, port: 5432, user: 'postgres',
@@ -39,16 +39,26 @@ async function openrouterUsageUsd() {
   return json?.data?.usage ?? null;
 }
 
+// Real auth path: sign in with the fixture user's password, same as the
+// browser would (chat route now requires a session, no more body userId).
+async function signIn(email, password) {
+  const res = await fetch(`${env.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const json = await res.json();
+  if (!json.access_token) throw new Error(`sign-in failed: ${JSON.stringify(json)}`);
+  return json.access_token;
+}
+
 await pgClient.connect();
-await pgClient.query(
-  `insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
-                           email_confirmed_at, created_at, updated_at,
-                           raw_app_meta_data, raw_user_meta_data)
-   values ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-           'chat_smoke@example.invalid', crypt('smoke', gen_salt('bf')), now(), now(), now(), '{}', '{}')
-   on conflict (id) do nothing`,
-  [USER],
-);
+const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+const { data: created, error: createErr } = await admin.auth.admin.createUser({
+  email: 'chat_smoke@example.invalid', password: 'smoke-pass-123', email_confirm: true,
+});
+if (createErr) throw createErr;
+const USER = created.user.id;
 const { rows: [kase] } = await pgClient.query(
   `insert into cases (user_id, case_type) values ($1, 'prescription_savings') returning id`, [USER],
 );
@@ -56,11 +66,13 @@ const { rows: [session] } = await pgClient.query(
   `insert into chat_sessions (user_id, case_id) values ($1, $2) returning id`, [USER, kase.id],
 );
 
+const token = await signIn('chat_smoke@example.invalid', 'smoke-pass-123');
+
 async function chat(message) {
   const res = await fetch(`${BASE}/api/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, sessionId: session.id, userId: USER }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message, sessionId: session.id }),
   });
   return { status: res.status, json: await res.json() };
 }
@@ -74,6 +86,8 @@ check('grounded query returns 200 with sources', grounded.status === 200 && (gro
 check('grounded response is non-empty text', typeof grounded.json?.response === 'string' && grounded.json.response.length > 40);
 console.log('--- grounded response (first 600 chars) ---');
 console.log((grounded.json?.response ?? '').slice(0, 600));
+console.log('--- grounded response (last 900 chars - trust receipt lives here) ---');
+console.log((grounded.json?.response ?? '').slice(-900));
 console.log('-------------------------------------------');
 
 // 2. Zero-match query: Zynteglo is NOT in the database -> short-circuit,
@@ -102,7 +116,7 @@ console.log('(tier/model/token detail per call is in the dev server log, [callMo
 await pgClient.query(`delete from chat_messages where session_id = $1`, [session.id]);
 await pgClient.query(`delete from chat_sessions where id = $1`, [session.id]);
 await pgClient.query(`delete from cases where id = $1`, [kase.id]);
-await pgClient.query(`delete from auth.users where id = $1`, [USER]);
+await admin.auth.admin.deleteUser(USER);
 await pgClient.end();
 
 console.log(failures === 0 ? '\nCHAT SMOKE: ALL PASS' : `\nCHAT SMOKE: ${failures} FAILURE(S)`);

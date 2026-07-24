@@ -174,6 +174,13 @@ support today):**
 
 ## Decisions locked (2026-07-24)
 
+- **Observed model costs** (first real smoke, pre-maxTokens-bump at the
+  1,000-token response cap): full 3-call chat smoke = ~$0.023
+  (~$0.0007 extraction, ~$0.0225 grounded response). Fractions of a cent
+  per grounded answer is the headline; expect slight upward shift with
+  the 1,500-token cap. Grounds the earlier $50-300/month estimate in
+  real numbers once volume assumptions exist.
+
 - **Model router**: OpenRouter direct, two tiers (lib/modelConfig.ts):
   `anthropic/claude-haiku-4.5:floor` for extraction,
   `anthropic/claude-sonnet-4.6:floor` for response. `:floor` = cheapest

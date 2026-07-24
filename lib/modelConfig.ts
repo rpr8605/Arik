@@ -24,6 +24,6 @@ export const MODEL_TIERS: Record<ModelTier, ModelSpec> = {
   response: {
     slug: 'anthropic/claude-sonnet-4.6:floor',
     maxPrice: { prompt: 3.0, completion: 15.0 },
-    maxTokens: 1000,
+    maxTokens: 1500,
   },
 };

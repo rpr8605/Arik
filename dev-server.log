@@ -1,0 +1,50 @@
+
+> arik@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.11 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://169.254.83.107:3000
+- Environments: .env.local
+✓ Ready in 793ms
+
+ GET /login 200 in 658ms (next.js: 482ms, proxy.ts: 5ms, application-code: 171ms)
+ GET / 307 in 148ms (next.js: 65ms, proxy.ts: 5ms, application-code: 77ms)
+ GET /login 200 in 44ms (next.js: 6ms, proxy.ts: 6ms, application-code: 32ms)
+ POST /api/cases/start 401 in 243ms (next.js: 211ms, proxy.ts: 7ms, application-code: 25ms)
+ POST /api/chat 401 in 63ms (next.js: 35ms, proxy.ts: 4ms, application-code: 24ms)
+ POST /api/cases/start 401 in 227ms (next.js: 4ms, proxy.ts: 5ms, application-code: 218ms)
+ POST /api/chat 401 in 125ms (next.js: 4ms, proxy.ts: 6ms, application-code: 116ms)
+ GET / 307 in 59ms (next.js: 6ms, proxy.ts: 6ms, application-code: 47ms)
+ GET /login 200 in 40ms (next.js: 6ms, proxy.ts: 4ms, application-code: 29ms)
+ POST /api/cases/start 401 in 15ms (next.js: 4ms, proxy.ts: 4ms, application-code: 7ms)
+ POST /api/chat 401 in 15ms (next.js: 3ms, proxy.ts: 4ms, application-code: 9ms)
+ POST /api/cases/start 201 in 500ms (next.js: 3ms, proxy.ts: 3ms, application-code: 493ms)
+[callModel] tier=extraction model=anthropic/claude-haiku-4.5 tokens=136/46
+[callModel] tier=response model=anthropic/claude-sonnet-4.6 tokens=2494/1097
+ POST /api/chat 200 in 24.8s (next.js: 7ms, proxy.ts: 4ms, application-code: 24.8s)
+ GET / 307 in 258ms (next.js: 89ms, proxy.ts: 86ms, application-code: 83ms)
+ GET /login 200 in 77ms (next.js: 18ms, proxy.ts: 4ms, application-code: 56ms)
+ POST /api/cases/start 401 in 80ms (next.js: 54ms, proxy.ts: 4ms, application-code: 22ms)
+ POST /api/chat 401 in 29ms (next.js: 16ms, proxy.ts: 4ms, application-code: 9ms)
+ POST /api/cases/start 201 in 318ms (next.js: 3ms, proxy.ts: 4ms, application-code: 311ms)
+[callModel] tier=extraction model=anthropic/claude-haiku-4.5 tokens=136/46
+[callModel] tier=response model=anthropic/claude-sonnet-4.6 tokens=2494/992
+ POST /api/chat 200 in 23.7s (next.js: 4ms, proxy.ts: 5ms, application-code: 23.7s)
+[callModel] tier=extraction model=anthropic/claude-haiku-4.5 tokens=132/42
+[callModel] tier=response model=anthropic/claude-sonnet-4.6 tokens=2490/1212
+ POST /api/chat 200 in 26.8s (next.js: 4ms, proxy.ts: 4ms, application-code: 26.8s)
+[callModel] tier=extraction model=anthropic/claude-haiku-4.5 tokens=133/43
+ POST /api/chat 200 in 1386ms (next.js: 4ms, proxy.ts: 3ms, application-code: 1379ms)
+ POST /api/cases 201 in 173ms (next.js: 55ms, proxy.ts: 6ms, application-code: 113ms)
+ PATCH /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa 409 in 1386ms (next.js: 1248ms, proxy.ts: 4ms, application-code: 134ms)
+ PATCH /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa 200 in 255ms (next.js: 14ms, proxy.ts: 4ms, application-code: 238ms)
+ POST /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa/deadlines 201 in 1119ms (next.js: 979ms, proxy.ts: 5ms, application-code: 135ms)
+ POST /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa/deadlines 200 in 21ms (next.js: 12ms, proxy.ts: 3ms, application-code: 6ms)
+ GET /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa/deadlines 200 in 121ms (next.js: 7ms, proxy.ts: 5ms, application-code: 110ms)
+ PUT /api/identity 200 in 521ms (next.js: 33ms, proxy.ts: 3ms, application-code: 485ms)
+ GET /api/identity?userId=33333333-3333-3333-3333-333333333333 200 in 139ms (next.js: 4ms, proxy.ts: 4ms, application-code: 131ms)
+ PATCH /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa 200 in 262ms (next.js: 15ms, proxy.ts: 4ms, application-code: 243ms)
+ PATCH /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa 200 in 226ms (next.js: 5ms, proxy.ts: 3ms, application-code: 218ms)
+ PATCH /api/cases/19e224c9-ae42-49ef-8943-c5fc642e31fa 409 in 126ms (next.js: 6ms, proxy.ts: 4ms, application-code: 116ms)
+ DELETE /api/privacy?userId=33333333-3333-3333-3333-333333333333 200 in 1959ms (next.js: 36ms, proxy.ts: 3ms, application-code: 1920ms)

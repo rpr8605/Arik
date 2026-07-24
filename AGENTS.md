@@ -85,11 +85,12 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   `user_identity.date_of_birth` to text (ciphertext is text).
 - `db/003_rls_policies.sql` — RLS on all 27 tables + `can_access_case()`
   helper. Reference data = authenticated read; user data = owner/caregiver.
-- `app/api/chat/route.ts` — the chat route draft. Client creation is lazy
-  (module-level clients crash Next builds). `callModel()`/
-  `loadSystemPrompt()` are typed stubs. Known warts to fix when wiring:
-  brand match is case-sensitive, no `JSON.parse` guard, user message
-  interpolated raw into the extraction prompt.
+- `app/api/chat/route.ts` — the chat route. Requires a session (Bearer
+  JWT or cookie via `lib/session.ts`; 401 otherwise). 3-step pipeline:
+  extraction → retrieval → grounded response; empty retrieval and
+  unparseable extraction both short-circuit to deterministic answers in
+  code. `callModel()` (OpenRouter direct, `lib/callModel.ts`) logs one
+  usage line per call.
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure
@@ -106,16 +107,29 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   - `mtm.ts` — MTM eligibility, pure `computeMtmEligibility()` (tested by
     `scripts/test_mtm.ts`) + DB loader `computeAndStoreMtmCheck()`.
   - `supabaseAdmin.ts` — lazy service-role client; server-only.
+  - `supabaseBrowser.ts` — publishable-key browser client; client comps.
+  - `session.ts` — `getUserId(req)`: Bearer JWT or cookie session →
+    userId, else null (→ 401). Used by `/api/chat` and `/api/cases/start`.
+- `app/` — `login` (magic link + password), `auth/callback`, `page.tsx`
+  (case list + "what's going on?" front door), `cases/[id]` (+ Thread
+  client comp), `api/cases/start` (creates case + session from free
+  text; keyword-type heuristic is a visible filing aid). `proxy.ts`
+  refreshes the auth cookie (Next 16's name for middleware).
 - `scripts/` — `validate_repo.py` (structural gate), `apply_db.mjs`
   (fresh-project schema apply + verify), `run_sql.mjs` (apply one file),
   `smoke_rls.mjs` (RLS cross-user tests, needs fixture users in
-  auth.users — self-cleaning), `seed_drugs.mjs`, `check_seed.mjs`,
-  `test_transitions.ts`, `test_mtm.ts`. Node scripts read `.env.local`.
+  auth.users — self-cleaning), `seed_drugs.mjs`, `seed_exploits.mjs`,
+  `check_seed.mjs`, `check_exploits.mjs`, `test_transitions.ts`,
+  `test_mtm.ts`, `smoke_http.mjs` (API workflow + 409s),
+  `smoke_chat.mjs` (grounded + short-circuit chat paths),
+  `smoke_flow.mjs` (onboarding front door e2e). Node scripts read
+  `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),
   `managed-patients`, `privacy` (DELETE all / PATCH clear category),
-  `outcomes`. Each carries an AUTH NOTE: userId comes from the request
-  until Phase 1 wires Supabase auth — do not deploy publicly before then.
+  `outcomes`. `/api/chat` and `/api/cases/start` enforce auth via
+  `lib/session.ts`; the rest still carry the AUTH NOTE (userId from
+  request) until their UIs land — do not deploy publicly before then.
 - `chat_system_prompt.md` — loaded at runtime; contains hard rules,
   crisis-awareness standing instruction, required trust-receipt section.
   Keep all three intact if edited.

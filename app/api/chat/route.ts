@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { callModel } from '@/lib/callModel';
+import { getUserId } from '@/lib/session';
 
 // Created lazily per call - a module-level client crashes Next's
 // build-time page-data collection when env vars aren't present.
@@ -55,11 +56,13 @@ Schema:
 
 // --- Step 2: query the brain, not the model ---
 async function retrieveContext(userId: string, intent: Intent) {
+  // maybeSingle: new users have no matching-profile row yet (onboarding
+  // is incremental per CRISIS_AWARE_DESIGN.md) - that's a null, not an error.
   const { data: profile } = await supabase()
     .from('user_matching_profile')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
   const { data: medications } = await supabase()
     .from('user_medications')
@@ -119,7 +122,9 @@ export async function POST(req: Request) {
   // case. Session creation (tied to a case) happens in the case-creation
   // flow, not here - this route assumes sessionId already resolves to a
   // case-scoped session.
-  const { message, sessionId, userId } = await req.json();
+  const userId = await getUserId(req);
+  if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 });
+  const { message, sessionId } = await req.json();
 
   const intent = await extractIntent(message);
 
