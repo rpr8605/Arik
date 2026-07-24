@@ -42,6 +42,14 @@ export class IllegalTransitionError extends Error {
   }
 }
 
+// Pure guard, exported for testing and for any caller that wants to check
+// before attempting a write. transitionCase() calls this internally.
+export function assertLegalTransition(from: CaseStatus, to: CaseStatus): void {
+  if (!ALLOWED_TRANSITIONS[from].includes(to)) {
+    throw new IllegalTransitionError(from, to);
+  }
+}
+
 export interface ArikCase {
   id: string;
   user_id: string | null;
@@ -137,9 +145,7 @@ export async function transitionCase(
 ): Promise<ArikCase> {
   const current = await getCase(id);
   if (!current) throw new Error(`Case not found: ${id}`);
-  if (!ALLOWED_TRANSITIONS[current.status].includes(to)) {
-    throw new IllegalTransitionError(current.status, to);
-  }
+  assertLegalTransition(current.status, to);
   const { data, error } = await supabaseAdmin()
     .from('cases')
     .update({

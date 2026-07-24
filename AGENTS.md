@@ -17,13 +17,17 @@ Arik database yet — see "Supabase target project" below.
 
 ## Supabase target project (READ BEFORE ANY DB WORK)
 
-The Supabase MCP server in this environment is connected to the **MsJaneHH
-project** (home-health OASIS QA — organizations/patients/qa_rules/
-rule_citations, live data). **Never apply Arik migrations, seeds, or
-destructive SQL there.** Arik needs its own Supabase project; until one is
-connected, DB changes live as SQL files only. Apply order on a fresh
-project: `schema.sql` → `db/002_identity_crypto.sql` →
-`db/003_rls_policies.sql`.
+Arik's project is live: `iwayoxmpbueneagdkpzj` (schema + 002–005 applied
+2026-07-24 via direct Postgres; seeded: 15 drugs, 18 price points, 2
+sources). **Check which project the MCP session is bound to before ANY
+MCP DB call** — the MCP in older sessions still points at the **MsJaneHH
+project** (organizations/patients/qa_rules, live data); never run Arik
+SQL there. Direct Postgres (scripts below, driven by `.env.local`) is the
+safe path until the retargeted MCP is confirmed via `list_tables`.
+Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
+→ `db/003_rls_policies.sql` → `db/004_grants.sql` →
+`db/005_can_access_case_security_definer.sql` (or `scripts/apply_db.mjs`
+then `scripts/run_sql.mjs` for 004/005).
 
 ## Authority and read order
 
@@ -85,7 +89,8 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   interpolated raw into the extraction prompt.
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
-    (`IllegalTransitionError` → 409 at the API layer).
+    (`IllegalTransitionError` → 409 at the API layer). Guard is the pure
+    `assertLegalTransition()` — tested by `scripts/test_transitions.ts`.
   - `deadlines.ts` — deadline engine. Rules carry `basis` text; unverified
     rules store `source_id`/`last_verified_at` null; no matching rule →
     honest `no_rule` result, never a guessed deadline.
@@ -95,7 +100,14 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     values).
   - `caregivers.ts`, `privacy.ts` (full deletion cascade + per-category
     demographic clearing), `outcomes.ts` (patient-confirmed only).
+  - `mtm.ts` — MTM eligibility, pure `computeMtmEligibility()` (tested by
+    `scripts/test_mtm.ts`) + DB loader `computeAndStoreMtmCheck()`.
   - `supabaseAdmin.ts` — lazy service-role client; server-only.
+- `scripts/` — `validate_repo.py` (structural gate), `apply_db.mjs`
+  (fresh-project schema apply + verify), `run_sql.mjs` (apply one file),
+  `smoke_rls.mjs` (RLS cross-user tests, needs fixture users in
+  auth.users — self-cleaning), `seed_drugs.mjs`, `check_seed.mjs`,
+  `test_transitions.ts`, `test_mtm.ts`. Node scripts read `.env.local`.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),
   `managed-patients`, `privacy` (DELETE all / PATCH clear category),

@@ -97,6 +97,28 @@ export async function POST(req: Request) {
   const intent = await extractIntent(message);
   const context = await retrieveContext(userId, intent);
 
+  // Empty-retrieval short-circuit (locked 2026-07-24): when nothing
+  // drug-specific came back, answer deterministically in code instead of
+  // calling the response model with an empty context and trusting the
+  // prompt to hold the line. accumulator_policies alone don't count as
+  // coverage - a savings answer needs at least one drug-specific row
+  // (exploit or price point); general policy rows invite free-association.
+  const nothingDrugSpecific =
+    (context.exploits ?? []).length === 0 && (context.prices ?? []).length === 0;
+  if (nothingDrugSpecific) {
+    const response =
+      `I don't have anything in my data${intent.drug_name ? ` on "${intent.drug_name}"` : ''} - ` +
+      'no price points, no assistance programs, nothing I can cite. ' +
+      "I'd rather tell you that plainly than guess. If you give me the " +
+      'drug name exactly as it appears on your prescription (brand or ' +
+      'generic), your dose, and your insurance type, I can check again.';
+    await supabase().from('chat_messages').insert([
+      { session_id: sessionId, role: 'user', content: message },
+      { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: [] },
+    ]);
+    return Response.json({ response, sources: [] });
+  }
+
   const { data: history } = await supabase()
     .from('chat_messages')
     .select('role, content')

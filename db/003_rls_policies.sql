@@ -53,9 +53,14 @@ create policy "caregiver" on authorizations_on_file for all to authenticated
                         and mp.caregiver_user_id = (select auth.uid())));
 
 -- Case access shared by the case owner and the caregiver of the managed
--- patient the case belongs to. Security invoker: caller's RLS still applies.
+-- patient the case belongs to. SECURITY DEFINER is required here: as the
+-- invoker this function recursed through the cases policy that calls it
+-- (found by smoke test 2026-07-24, see db/005). The owner (postgres)
+-- bypasses RLS, breaking the cycle; the function exposes only a boolean.
 create or replace function can_access_case(p_case_id uuid) returns boolean
-  language sql security invoker stable as $$
+  language sql security definer stable
+  set search_path = public
+as $$
   select exists (
     select 1 from cases c
     where c.id = p_case_id

@@ -191,10 +191,7 @@ support today):**
 - `employer_plans.extracted_plan_facts` must be scrubbed of any
   contributing uploader's identity before being cached - this is an
   extraction-pipeline requirement, not just a schema comment
-- `managed_patients.zip_code` (LOCATION_SERVICES.md) and prescriber/NPI
-  fields (BEHAVIOR.md) are specced in their docs but not yet in
-  schema.sql - add as additive columns during Phase 1 build
-- EXCEPTION_INTELLIGENCE_ENGINE.md and PHARMACIST_AND_REVCYCLE_FORMATS.md
-  are referenced for Phase 2/3 work but not yet in the repo - restore or
-  draft them before those phases start (schema already reflects their
-  decisions)
+- EXCEPTION_INTELLIGENCE_ENGINE.md is referenced for Phase 3 work but is
+  still not in the repo - restore or draft it before that phase starts
+  (schema already reflects its decisions; PHARMACIST_AND_REVCYCLE_FORMATS.md
+  arrived 2026-07-24)
