@@ -61,7 +61,7 @@ confirm pattern). AGENTS.md holds OpenCode-specific working instructions.
 None of these define database tables, but read them before building the
 corresponding feature.
 
-## What's actually in schema.sql (27 tables)
+## What's actually in schema.sql (31 tables)
 
 Grouped by the doc that specs them:
 
@@ -69,10 +69,12 @@ Grouped by the doc that specs them:
   `user_matching_profile` - note the deliberate absence of an immigration
   status column (IMMIGRATION_STATUS_HANDLING.md) and SSN column
   (SECURITY.md)
-- **Caregiver mode** (CAREGIVER_MODE.md): `managed_patients`,
-  `authorizations_on_file`
-- **Case model** (CASE_MODEL.md): `cases`, `deadlines`, `escalations`,
-  `case_outcomes`, plus evidence-freshness columns on `sources`
+- **Caregiver mode** (CAREGIVER_MODE.md): `managed_patients` (+
+  `extended_retention` recurring-care opt-in), `authorizations_on_file`
+- **Case model** (CASE_MODEL.md): `cases` (+ `resolved_at` retention
+  clock), `deadlines`, `escalations`, `case_outcomes`, `case_summaries`
+  (DATA_RETENTION.md's surviving aggregate at purge time), plus
+  evidence-freshness columns on `sources`
 - **Drug pricing** (Phase 1 core, README.md/seed_drugs.json):
   `drugs`, `user_medications`, `price_points`, `exploits` (now includes
   `underlying_processor`/BIN/PCN fields per
@@ -92,6 +94,17 @@ Grouped by the doc that specs them:
   CAREGIVER_MODE.md): `output_documents`, `shared_reviews`
 - **Chat** (BEHAVIOR.md, CASE_MODEL.md): `chat_sessions` (now case-scoped
   - one thread per case, not one long history), `chat_messages`
+- **Conversational extraction** (CONVERSATIONAL_ENTITY_EXTRACTION.md):
+  `pending_case_facts` (pre-case fact staging), `pending_fact_corrections`
+  (don't-silently-overwrite queue), plus `cases.institution_name` and
+  `user_matching_profile.insurance_plan_name`/`state_or_location_raw`
+- **Consent ledger** (SECURITY.md, cited by DATA_RETENTION.md):
+  `consent_ledger` (append-only audit of consent-relevant choices:
+  language preference, extended-retention opt-ins, demographic
+  opt-ins/clears), plus `user_matching_profile.preferred_language`
+  (UNIVERSAL_ACCESS.md; launch scope English/Spanish only - extraction
+  quality in other languages unvalidated, a launch decision not a
+  technical one)
 
 ## Build sequence (per CASE_MODEL.md, supersedes any older phase list)
 
@@ -131,7 +144,17 @@ support today):**
   prescriber, location), merge every extracted fact into the durable
   profile immediately (never-ask-twice, with the
   don't-silently-overwrite rule), and add the "check before asking" hard
-  rule to chat_system_prompt.md
+  rule to chat_system_prompt.md. **Built 2026-07-28** (Feature A): db/006,
+  lib/extractedFacts.ts + lib/resolveLocation.ts, `/api/corrections`
+  (one-tap confirm/dismiss), Thread inline correction cards, pre-case
+  staging migrated on `/api/cases/start`; smoke_extraction.mjs 26/26
+- Language preference (UNIVERSAL_ACCESS.md). **Built 2026-07-28**
+  (Feature B): db/007 (`preferred_language` + `consent_ledger`),
+  `/api/preferences` GET/PUT (en/es only, other codes rejected as a
+  launch-scope decision), home-page language control, chat route
+  generates in-language with citations kept verbatim-untranslated
+  (correctness rule), Spanish deterministic short-circuits;
+  smoke_language.mjs 15/15 including Spanish-input extraction
 
 **Phase 1.5 - parallel track, not sequential after Phase 1:**
 - Bill auditor, denial appeals, charity care screening - document-in,
@@ -140,17 +163,33 @@ support today):**
   uploaded documents per case, not processing each independently
 - Guided document capture (GUIDED_DOCUMENT_SCANNING.md) - camera-first
   guided flow with client-side quality checks; captured photos go
-  straight to the extraction tier (it accepts images), no OCR service
+  straight to the extraction tier (it accepts images), no OCR service.
+  **Partially built 2026-07-28** (Feature C): the OS-camera capture
+  input (`capture="environment"`) feeds the same pipeline; the guided
+  getUserMedia overlay with live blur/glare checks is a deferred
+  frontend-only increment on the same endpoint
 - Multi-format intake (MULTI_FORMAT_UPLOAD.md) - PDF/image upload beside
   the camera flow; native-PDF text extraction first, vision model only
   as fallback; HEIC converted on upload; `source_format` on
-  `uploaded_documents` is additive
+  `uploaded_documents` is additive. **Built 2026-07-28** (Feature C):
+  db/008 (+ private `raw-uploads` bucket, `extraction_status`,
+  `raw_upload_expires_at`), lib/documentIntake.ts (pdfjs text-first,
+  pdf-to-img raster fallback, heic-convert server-side, 25MB cap,
+  type/size screening only - malware scanning is a known deferred gap),
+  `/api/cases/[id]/documents`, both UI entry points on the case page;
+  extracted institutions merge into the case via Feature A's path;
+  smoke_documents.mjs 20/20
 - Data retention automation (DATA_RETENTION.md) - scheduled deletion,
-  not just delete-on-request: raw uploads expire hours after extraction,
-  case data 90 days post-`resolved_at`, extended-retention opt-in for
-  caregivers. Needs `resolved_at` on `cases`, an expiry field on
-  `uploaded_documents`, and a consent-ledger table (SECURITY.md does not
-  currently define one - gap, see Known open items)
+  not just delete-on-request. **Built 2026-07-28** (Feature D): db/009
+  (`resolved_at`, `managed_patients.extended_retention`,
+  `case_summaries`, `purge_expired_cases()` + pg_cron daily 04:15 UTC);
+  raw-upload purge as `/api/jobs/purge-expired-uploads` (48h expiry set
+  at upload; SQL can't touch Storage, so it's an HTTP job - the mirrored
+  Edge Function in supabase/functions/ is written but its deploy is
+  blocked on MCP/CLI project access, see Known open items); consent
+  ledger writers live for language, extended-retention opt-in/out, and
+  demographic clears. 48h/90d are WORKING DEFAULTS pending Hunter/legal
+  review before Privacy Policy publication. smoke_retention.mjs 21/21
 
 **Phase 2:**
 - Export/print/translation (EXPORT_AND_TRANSLATION.md)
@@ -228,13 +267,21 @@ support today):**
   extraction-pipeline requirement, not just a schema comment
 - **Consent ledger gap**: DATA_RETENTION.md twice cites "the consent
   ledger already required by SECURITY.md" - SECURITY.md defines no such
-  thing, and no `consent_ledger` table exists. Treat as an intended new
-  requirement: add the table (opt-in/opt-out choices with timestamps,
-  per category) plus the requirement line to SECURITY.md when the Phase
-  1.5 retention increment lands.
-- Scheduled deletion: pg_cron 1.6.4 and pg_net 0.20.4 are AVAILABLE on
-  the Arik project (checked 2026-07-24, not yet installed) - the
-  retention job can live Supabase-side with no external scheduler.
+  thing. **Closed 2026-07-28**: db/007 table (append-only, owner-read
+  RLS, service-role writes via lib/consent.ts) with writers live for
+  language preference, extended-retention opt-in/out, and demographic
+  clears. Remaining: add the requirement line to SECURITY.md itself.
+- Scheduled deletion: pg_cron 1.6.4 + pg_net 0.20.4 INSTALLED
+  2026-07-28 (db/009); `purge-expired-cases` runs daily 04:15 UTC. The
+  raw-upload purge exists as `/api/jobs/purge-expired-uploads` (tested)
+  and as an Edge Function source in supabase/functions/ - **deploy of
+  the Edge Function + the pg_net schedule for raw uploads is the one
+  open action**: MCP is bound to the MsJaneHH project (reconfirmed
+  2026-07-28) and the local CLI account doesn't include the Arik
+  project. Until then, raw-upload purging runs when the HTTP route is
+  invoked (any external cron with the service-role key can call it).
+  Note: cron.job rejects direct DML on Supabase - use cron.unschedule/
+  cron.schedule only.
 - EXCEPTION_INTELLIGENCE_ENGINE.md is referenced for Phase 3 work but is
   still not in the repo - restore or draft it before that phase starts
   (schema already reflects its decisions; PHARMACIST_AND_REVCYCLE_FORMATS.md

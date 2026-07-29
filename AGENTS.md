@@ -26,8 +26,11 @@ SQL there. Direct Postgres (scripts below, driven by `.env.local`) is the
 safe path until the retargeted MCP is confirmed via `list_tables`.
 Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/003_rls_policies.sql` → `db/004_grants.sql` →
-`db/005_can_access_case_security_definer.sql` (or `scripts/apply_db.mjs`
-then `scripts/run_sql.mjs` for 004/005).
+`db/005_can_access_case_security_definer.sql` →
+`db/006_conversational_extraction.sql` →
+`db/007_language_and_consent_ledger.sql` → `db/008_document_intake.sql`
+→ `db/009_data_retention.sql` (or `scripts/apply_db.mjs` then
+`scripts/run_sql.mjs` for 004+; 006–009 are idempotent).
 
 ## Authority and read order
 
@@ -78,7 +81,7 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 
 ## Key files and their status
 
-- `schema.sql` — 27 tables, single source of truth for the DB. Apply
+- `schema.sql` — 31 tables, single source of truth for the DB. Apply
   first on a fresh project.
 - `db/002_identity_crypto.sql` — pgcrypto extension + `encrypt_identity`/
   `decrypt_identity` helpers (service-role only). Widens
@@ -95,6 +98,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure
     `assertLegalTransition()` — tested by `scripts/test_transitions.ts`.
+    Terminal transitions (`resolved_won`/`resolved_lost`/
+    `closed_by_patient`) set `resolved_at`, starting the 90-day
+    retention clock.
   - `deadlines.ts` — deadline engine. Rules carry `basis` text; unverified
     rules store `source_id`/`last_verified_at` null; no matching rule →
     honest `no_rule` result, never a guessed deadline.
@@ -103,9 +109,25 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     only; everything else uses `readIdentityMasked()` (booleans, never
     values).
   - `caregivers.ts`, `privacy.ts` (full deletion cascade + per-category
-    demographic clearing), `outcomes.ts` (patient-confirmed only).
+    demographic clearing; clears are consent-ledgered), `outcomes.ts`
+    (patient-confirmed only).
   - `mtm.ts` — MTM eligibility, pure `computeMtmEligibility()` (tested by
     `scripts/test_mtm.ts`) + DB loader `computeAndStoreMtmCheck()`.
+  - `extractedFacts.ts` — Feature A merge step (built 2026-07-28): every
+    extracted fact → durable profile/case/med row immediately;
+    contradictions park in `pending_fact_corrections` (never silent
+    overwrite, never blocking); pre-case facts stage in
+    `pending_case_facts` and migrate on case creation.
+  - `resolveLocation.ts` — pure raw-location → zip/state resolver (tested
+    by `scripts/test_location.ts`). USPS codes match case-sensitively on
+    purpose ("in" ≠ Indiana).
+  - `consent.ts` — the ONLY write path for `consent_ledger` (append-only;
+    no update/delete anywhere; RLS is owner-read, service-role-write).
+  - `documentIntake.ts` — Feature C pipeline (built 2026-07-28): pdfjs
+    text-first for native PDFs, pdf-to-img raster fallback for scanned,
+    heic-convert server-side, magic-byte image sniffing, 25MB cap.
+    Screening is type/size only — malware scanning is a known deferred
+    gap, do not close it accidentally.
   - `supabaseAdmin.ts` — lazy service-role client; server-only.
   - `supabaseBrowser.ts` — publishable-key browser client; client comps.
   - `session.ts` — `getUserId(req)`: Bearer JWT or cookie session →
@@ -120,14 +142,29 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   `smoke_rls.mjs` (RLS cross-user tests, needs fixture users in
   auth.users — self-cleaning), `seed_drugs.mjs`, `seed_exploits.mjs`,
   `check_seed.mjs`, `check_exploits.mjs`, `test_transitions.ts`,
-  `test_mtm.ts`, `smoke_http.mjs` (API workflow + 409s),
-  `smoke_chat.mjs` (grounded + short-circuit chat paths),
-  `smoke_flow.mjs` (onboarding front door e2e). Node scripts read
+  `test_mtm.ts`, `test_location.ts`, `smoke_http.mjs` (API workflow +
+  409s), `smoke_chat.mjs` (grounded + short-circuit chat paths),
+  `smoke_extraction.mjs` (Feature A: merge, corrections confirm/dismiss,
+  staging migration), `smoke_language.mjs` (Feature B: preference API,
+  launch-scope 400s, ledger rows, es chat + es extraction),
+  `smoke_documents.mjs` (Feature C: pdf native/scanned/image/HEIC-fail,
+  401/413/415, storage + expiry), `smoke_retention.mjs` (Feature D:
+  resolved_at, extended-retention opt-in/out + ledger, raw-upload purge,
+  pg_cron case purge + summary), `smoke_flow.mjs` (onboarding front
+  door e2e). Node scripts read
   `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),
   `managed-patients`, `privacy` (DELETE all / PATCH clear category),
-  `outcomes`. `/api/chat` and `/api/cases/start` enforce auth via
+  `outcomes`, `corrections` (one-tap confirm/dismiss of pending fact
+  corrections; whitelisted targets only), `preferences` (language GET/PUT;
+  en/es launch scope, every change ledgered), `cases/[id]/documents`
+  (upload → storage → preprocess → extract → persist; failures kept as
+  first-class 'failed' rows, 502), `managed-patients` PATCH
+  (extended-retention opt-in/out, session-authed, ledgered),
+  `jobs/purge-expired-uploads` (service-key bearer only; deletes expired
+  raw Storage objects, keeps rows). `/api/chat` and
+  `/api/cases/start` enforce auth via
   `lib/session.ts`; the rest still carry the AUTH NOTE (userId from
   request) until their UIs land — do not deploy publicly before then.
 - `chat_system_prompt.md` — loaded at runtime; contains hard rules,
@@ -155,6 +192,26 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   postcss/sharp deps; `npm audit fix --force` would downgrade Next to 9.x
   — do NOT run it. Accepted for the pilot (build-time only, no custom
   CSS, no self-hosted image optimization); revisit before production.
+- `pdfjs-dist` must stay on 5.6.205 — pdf-to-img bundles that exact
+  version and pdfjs throws "API version does not match Worker version"
+  otherwise. Keep them deduped.
+- pdfjs `standardFontDataUrl` needs a real fs path with a trailing
+  FORWARD slash (Turbopack's require.resolve returns a virtual
+  "[externals]" path; use process.cwd() + node_modules, see
+  lib/documentIntake.ts).
+- Uploads >10MB need `experimental.proxyClientMaxBodySize: '30mb'` in
+  next.config.ts — Next 16's proxy truncates multipart bodies at 10MB by
+  default and the route then dies with a 500 formData parse error.
+- `cron.job` rejects direct DML on Supabase (42501 even as postgres) —
+  use `cron.unschedule()`/`cron.schedule()` only. And run_sql.mjs sends
+  multi-statement files as ONE implicit transaction: any failure rolls
+  the whole file back (a mid-file cron.job failure looked like the
+  extensions "never installed" — check pg_extension after errors).
+- Edge Function deploy for `supabase/functions/purge-expired-uploads/`
+  is BLOCKED: MCP is bound to MsJaneHH (reconfirmed 2026-07-28) and the
+  local CLI account lacks the Arik project. `/api/jobs/purge-expired-
+  uploads` runs the identical purge today; deploy + pg_net schedule is
+  the one open infra action.
 
 ## Architecture intent (affects how you extend it)
 

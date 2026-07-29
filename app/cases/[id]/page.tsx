@@ -58,6 +58,13 @@ export default async function CasePage({
         {kase.next_action ? ` — next: ${kase.next_action}` : ''}
       </p>
       {kase.institution_name ? <p>{kase.institution_name}</p> : null}
+      {kase.resolved_at ? (
+        <p>
+          Resolved. Case data auto-deletes on{' '}
+          {new Date(new Date(kase.resolved_at).getTime() + 90 * 24 * 3600_000).toLocaleDateString()}{' '}
+          (a summary of the outcome is kept).
+        </p>
+      ) : null}
       <DocumentUpload caseId={id} />
       {session ? (
         <Thread

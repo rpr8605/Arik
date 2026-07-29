@@ -62,6 +62,7 @@ export interface ArikCase {
   institution_name: string | null;
   next_action: string | null;
   next_action_due: string | null;
+  resolved_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -139,6 +140,12 @@ export async function listCases(userId: string): Promise<ArikCase[]> {
   return [...byId.values()];
 }
 
+// Terminal statuses that start the retention clock (DATA_RETENTION.md:
+// 90 days post-resolution, working default pending Hunter/legal review).
+// All three are terminal in ALLOWED_TRANSITIONS, so resolved_at is set
+// exactly once and never needs clearing.
+const RESOLVED_STATUSES: readonly CaseStatus[] = ['resolved_won', 'resolved_lost', 'closed_by_patient'];
+
 export async function transitionCase(
   id: string,
   to: CaseStatus,
@@ -147,13 +154,15 @@ export async function transitionCase(
   const current = await getCase(id);
   if (!current) throw new Error(`Case not found: ${id}`);
   assertLegalTransition(current.status, to);
+  const now = new Date().toISOString();
   const { data, error } = await supabaseAdmin()
     .from('cases')
     .update({
       status: to,
       next_action: opts.nextAction ?? current.next_action,
       next_action_due: opts.nextActionDue ?? current.next_action_due,
-      updated_at: new Date().toISOString(),
+      resolved_at: RESOLVED_STATUSES.includes(to) ? now : current.resolved_at,
+      updated_at: now,
     })
     .eq('id', id)
     .select()

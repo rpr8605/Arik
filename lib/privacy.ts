@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabaseAdmin';
+import { recordConsent } from './consent';
 
 // Privacy and deletion controls (SECURITY.md): a user can erase
 // everything, and demographic eligibility categories are independently
@@ -18,6 +19,14 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
     if (error) throw new Error(`${table}: ${error.message}`);
     deleted[table] = (deleted[table] ?? 0) + (data?.length ?? 0);
   }
+
+  // Working rows + audit trail first: pending_fact_corrections references
+  // cases (FK), so it must go before any case deletion; the consent
+  // ledger is the user's own data too - "erase everything" includes it.
+  await del('pending_fact_corrections', (q) => q.eq('user_id', userId));
+  await del('pending_case_facts', (q) => q.eq('user_id', userId));
+  await del('consent_ledger', (q) => q.eq('user_id', userId));
+  await del('case_summaries', (q) => q.eq('user_id', userId));
 
   const { data: sessions } = await sb.from('chat_sessions').select('id').eq('user_id', userId);
   const sessionIds = (sessions ?? []).map((s) => s.id);
@@ -100,5 +109,10 @@ export async function clearDemographicCategory(
     })
     .eq('id', userId);
   if (updateErr) throw updateErr;
+  // Consent ledger records every demographic clear (broader logging is
+  // the safer default for a compliance-sensitive ledger).
+  await recordConsent(sb, userId, 'demographic_eligibility', 'clear', {
+    demographic_category: category,
+  });
   return { cleared: true };
 }

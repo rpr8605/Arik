@@ -89,7 +89,12 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
       />
       <span> (PDF, photo, or screenshot, up to 25MB)</span>
       {busy && <p>Reading your document…</p>}
-      {result && <p role="status">{result}</p>}
+      {result && (
+        <p role="status">
+          {result}. The original file auto-deletes within 48 hours; what Arik read from it stays
+          with the case.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
     </section>
   );

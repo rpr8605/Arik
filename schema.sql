@@ -71,6 +71,7 @@ create table managed_patients (
   patient_name text not null,
   relationship text,                -- 'parent', 'spouse', 'child', etc
   zip_code text,                     -- managed patient's own location may differ from the caregiver's
+  extended_retention boolean default false, -- per DATA_RETENTION.md: recurring-care opt-in that exempts this patient's cases from the post-resolution purge; every change is consent-ledgered
   created_at timestamptz default now()
 );
 
@@ -120,6 +121,7 @@ create table cases (
   institution_name text,              -- hospital/clinic named in conversation or documents, per CONVERSATIONAL_ENTITY_EXTRACTION.md; drives charity-care matching against hospital_financial_assistance_policies
   next_action text,
   next_action_due date,
+  resolved_at timestamptz,            -- set when status enters resolved_won/resolved_lost/closed_by_patient; starts the retention clock (90d working default, pending Hunter/legal review)
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -167,6 +169,27 @@ create table case_outcomes (
   is_recurring boolean,
   patient_confirmed boolean default false,
   arik_confidence text,               -- mirrors evidence_grade style: high/medium/low
+  created_at timestamptz default now()
+);
+
+-- The aggregate that outlives the case (DATA_RETENTION.md): when the
+-- post-resolution purge deletes a case's working detail, this small
+-- "here's what happened" summary survives. case_outcomes alone was
+-- checked and is NOT sufficient for this (no case_type, no final status,
+-- no resolution date, and it doesn't always exist) - this is the smallest
+-- table that satisfies the requirement. Written only by the purge job.
+create table case_summaries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  managed_patient_id uuid references managed_patients(id),
+  case_type text not null,
+  institution_name text,
+  final_status text not null,          -- 'resolved_won', 'resolved_lost', 'closed_by_patient'
+  original_amount_owed_usd numeric,    -- amounts carried from the latest case_outcomes row, when one exists
+  revised_amount_owed_usd numeric,
+  refund_received_usd numeric,
+  future_monthly_savings_usd numeric,
+  resolved_at timestamptz not null,
   created_at timestamptz default now()
 );
 
