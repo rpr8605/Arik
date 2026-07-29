@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/session';
 import { createCase, type CaseType } from '@/lib/cases';
+import { migrateStagedFactsIntoCase } from '@/lib/extractedFacts';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // The "what's going on?" front door: whatever the patient types becomes
@@ -38,6 +39,10 @@ export async function POST(req: NextRequest) {
       .select('id')
       .single();
     if (error) throw error;
+    // Facts extracted in pre-case chat move onto the new case
+    // (CONVERSATIONAL_ENTITY_EXTRACTION.md); conflicts park as pending
+    // corrections rather than overwriting.
+    await migrateStagedFactsIntoCase(supabaseAdmin(), userId, kase.id);
     return NextResponse.json({ caseId: kase.id, sessionId: session.id }, { status: 201 });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

@@ -43,6 +43,8 @@ create table user_matching_profile (
   state text,
   zip_code text,                    -- per LOCATION_SERVICES.md; state can be derived from this
   insurance_type text,               -- 'employer', 'marketplace', 'medicare_part_d', 'medicaid', 'uninsured'
+  insurance_plan_name text,          -- raw plan name as stated ("Cigna PPO"), per CONVERSATIONAL_ENTITY_EXTRACTION.md; informs accumulator_policies matching
+  state_or_location_raw text,        -- raw location text as extracted ("Austin, TX"); zip_code/state are resolved from it deterministically in code
   income_bracket text,               -- optional, only if patient wants PAP/charity-care matching
   household_size int,                -- optional, same opt-in pattern as income
   preferred_pharmacy text,
@@ -114,6 +116,7 @@ create table cases (
     -- 'gathering_evidence', 'action_ready', 'submitted', 'awaiting_response',
     -- 'resolved_won', 'resolved_lost', 'closed_by_patient', 'escalated'
   organizations_involved text[],
+  institution_name text,              -- hospital/clinic named in conversation or documents, per CONVERSATIONAL_ENTITY_EXTRACTION.md; drives charity-care matching against hospital_financial_assistance_policies
   next_action text,
   next_action_due date,
   created_at timestamptz default now(),
@@ -436,4 +439,38 @@ create table chat_messages (
   content text not null,
   retrieved_exploit_ids uuid[],        -- audit trail: which exploits/rows grounded this answer
   created_at timestamptz default now()
+);
+
+-- ============================================================
+-- CONVERSATIONAL ENTITY EXTRACTION (per CONVERSATIONAL_ENTITY_EXTRACTION.md)
+-- ============================================================
+
+-- Case-scoped facts extracted before a case exists (pre-case chat), keyed
+-- to the user. Migrated into the case record when one is created, then
+-- deleted. Generic fact_type/fact_value so new extractable facts don't
+-- need a migration.
+create table pending_case_facts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  fact_type text not null,             -- 'institution_name', 'prescriber_name', ...
+  fact_value text not null,
+  created_at timestamptz default now()
+);
+
+-- The don't-silently-overwrite rule, made durable: when a new extraction
+-- contradicts an existing non-null value, the new value waits here for a
+-- one-tap patient confirm instead of being applied. A pending correction
+-- never blocks use of the existing value.
+create table pending_fact_corrections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  case_id uuid references cases(id),   -- nullable: profile-field corrections aren't case-scoped
+  target_table text not null,          -- 'user_matching_profile', 'user_medications', 'cases'
+  target_id uuid not null,             -- row id in target_table
+  field text not null,                 -- column name, whitelisted at the apply layer
+  old_value text,
+  new_value text not null,
+  status text default 'pending',       -- 'pending', 'confirmed', 'dismissed'
+  created_at timestamptz default now(),
+  resolved_at timestamptz
 );
