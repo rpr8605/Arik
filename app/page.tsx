@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { listCases } from '@/lib/cases';
 import { NewCaseForm } from './NewCaseForm';
+import { LanguagePreference } from './LanguagePreference';
 
 // Home = case list, not a profile wall (UI_UX.md, CRISIS_AWARE_DESIGN.md).
 export default async function Home() {
@@ -28,6 +29,7 @@ export default async function Home() {
 
   return (
     <main>
+      <LanguagePreference />
       <h1>What&apos;s going on?</h1>
       <NewCaseForm />
 

@@ -45,6 +45,7 @@ create table user_matching_profile (
   insurance_type text,               -- 'employer', 'marketplace', 'medicare_part_d', 'medicaid', 'uninsured'
   insurance_plan_name text,          -- raw plan name as stated ("Cigna PPO"), per CONVERSATIONAL_ENTITY_EXTRACTION.md; informs accumulator_policies matching
   state_or_location_raw text,        -- raw location text as extracted ("Austin, TX"); zip_code/state are resolved from it deterministically in code
+  preferred_language text default 'en', -- per UNIVERSAL_ACCESS.md: full-conversation language, generated directly not translated. Launch scope: 'en'/'es' only (non-English extraction quality unvalidated - launch decision, not technical)
   income_bracket text,               -- optional, only if patient wants PAP/charity-care matching
   household_size int,                -- optional, same opt-in pattern as income
   preferred_pharmacy text,
@@ -473,4 +474,22 @@ create table pending_fact_corrections (
   status text default 'pending',       -- 'pending', 'confirmed', 'dismissed'
   created_at timestamptz default now(),
   resolved_at timestamptz
+);
+
+-- ============================================================
+-- CONSENT LEDGER (per SECURITY.md as cited by DATA_RETENTION.md)
+-- ============================================================
+
+-- Append-only audit of every consent-relevant choice: language preference,
+-- extended-retention opt-ins, demographic eligibility opt-ins/clears.
+-- Broader logging is the safer default for a compliance-sensitive ledger.
+-- Rows are never updated or deleted; "revoking" a choice is a new row.
+-- Written only by the service role; patients can read their own history.
+create table consent_ledger (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  category text not null,              -- 'language', 'extended_retention', 'demographic_eligibility'
+  action text not null,                -- 'set', 'opt_in', 'opt_out', 'clear'
+  detail jsonb,                        -- e.g. {"language": "es"}, {"demographic_category": "race"}
+  created_at timestamptz default now()
 );
