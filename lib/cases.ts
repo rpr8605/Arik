@@ -59,6 +59,7 @@ export interface ArikCase {
   estimated_recoverable_usd: number | null;
   status: CaseStatus;
   organizations_involved: string[] | null;
+  institution_name: string | null;
   next_action: string | null;
   next_action_due: string | null;
   created_at: string;

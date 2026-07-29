@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getCase } from '@/lib/cases';
 import { Thread } from './Thread';
+import { DocumentUpload } from './DocumentUpload';
 
 export default async function CasePage({
   params,
@@ -56,6 +57,8 @@ export default async function CasePage({
         Status: <strong>{kase.status.replaceAll('_', ' ')}</strong>
         {kase.next_action ? ` — next: ${kase.next_action}` : ''}
       </p>
+      {kase.institution_name ? <p>{kase.institution_name}</p> : null}
+      <DocumentUpload caseId={id} />
       {session ? (
         <Thread
           sessionId={session.id}

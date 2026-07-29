@@ -6,14 +6,36 @@ import { MODEL_TIERS, type ModelTier } from './modelConfig';
 // provider, since a silent upgrade is exactly the kind of thing that
 // turns a cost-control rule into a surprise invoice.
 
+// An image for vision-capable tiers (document intake sends page/photo
+// images to the extraction tier as data-URL content parts).
+export interface ModelImage {
+  mediaType: 'image/jpeg' | 'image/png';
+  base64: string;
+}
+
 export async function callModel(opts: {
   tier: ModelTier;
   prompt: string;
   system?: string;
+  images?: ModelImage[];
+  maxTokens?: number; // per-call override (document extraction needs more than the chat-extraction default); the tier default holds otherwise
 }): Promise<string> {
   const spec = MODEL_TIERS[opts.tier];
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+
+  // Multimodal content parts when images are present; plain string
+  // otherwise so existing callers and models are unaffected.
+  const userContent =
+    opts.images && opts.images.length > 0
+      ? [
+          { type: 'text', text: opts.prompt },
+          ...opts.images.map((img) => ({
+            type: 'image_url',
+            image_url: { url: `data:${img.mediaType};base64,${img.base64}` },
+          })),
+        ]
+      : opts.prompt;
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -25,9 +47,9 @@ export async function callModel(opts: {
       model: spec.slug,
       messages: [
         ...(opts.system ? [{ role: 'system', content: opts.system }] : []),
-        { role: 'user', content: opts.prompt },
+        { role: 'user', content: userContent },
       ],
-      max_tokens: spec.maxTokens,
+      max_tokens: opts.maxTokens ?? spec.maxTokens,
       provider: { sort: 'price', max_price: spec.maxPrice },
     }),
   });

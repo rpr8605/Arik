@@ -256,8 +256,12 @@ create table uploaded_documents (
   user_id uuid references auth.users(id),
   case_id uuid references cases(id),
   managed_patient_id uuid references managed_patients(id),
-  doc_type text not null,             -- 'itemized_bill', 'eob', 'denial_letter', 'insurance_card', 'spd'
-  storage_path text,                  -- short-lived storage; deletion job runs post-extraction per SECURITY.md
+  doc_type text not null,             -- 'itemized_bill', 'eob', 'denial_letter', 'insurance_card', 'spd'; 'unclassified' when extraction failed
+  source_format text,                 -- per MULTI_FORMAT_UPLOAD.md: 'camera_capture', 'pdf_native', 'pdf_scanned', 'image_upload' (how the file arrived - separate axis from doc_type's what-it-is)
+  storage_path text,                  -- raw file in the private 'raw-uploads' Storage bucket; short-lived - deletion job runs per DATA_RETENTION.md
+  raw_upload_expires_at timestamptz,  -- raw upload purge deadline (48h working default, pending Hunter/legal review)
+  extraction_status text,             -- 'extracted', 'failed' (row kept either way; failed rows carry extraction_error)
+  extraction_error text,
   extracted_data jsonb,
   created_at timestamptz default now()
 );
