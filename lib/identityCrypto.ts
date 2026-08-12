@@ -6,14 +6,17 @@ import { supabaseAdmin } from './supabaseAdmin';
 // reads this module. The key lives in the app's environment, never in
 // the database.
 
+// Member-ID / group-number fields were removed 2026-08-12 (pre-demo item
+// 3): we have no way to verify them yet, and collecting them implies a
+// confidence we don't have. Broad plan type lives on
+// user_matching_profile.insurance_type instead. The DB columns remain
+// harmlessly; nothing writes them.
 export const IDENTITY_FIELDS = [
   'full_name',
   'date_of_birth',
   'address',
   'phone',
   'email',
-  'insurance_member_id',
-  'insurance_group_number',
 ] as const;
 export type IdentityField = (typeof IDENTITY_FIELDS)[number];
 

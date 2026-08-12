@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { callModel } from '@/lib/callModel';
 import { getUserId } from '@/lib/session';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
+import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON } from '@/lib/medicareEligibility';
 
 // Created lazily per call - a module-level client crashes Next's
 // build-time page-data collection when env vars aren't present.
@@ -44,11 +45,11 @@ const STRINGS = {
     en:
       "I couldn't pull a drug name out of that. Give me the drug name " +
       'exactly as it appears on your prescription (brand or generic), your ' +
-      'dose, and your insurance type, and I can check what you should be paying.',
+      'dose, and your insurance type, and I can check which savings paths might exist.',
     es:
       'No pude identificar el nombre del medicamento. Dame el nombre ' +
       'exactamente como aparece en tu receta (de marca o genérico), tu ' +
-      'dosis y tu tipo de seguro, y puedo verificar cuánto deberías pagar.',
+      'dosis y tu tipo de seguro, y puedo verificar qué opciones de ahorro podrían existir.',
   },
   noData: {
     en: (drug: string | null) =>
@@ -170,14 +171,17 @@ async function retrieveContext(userId: string, intent: Intent, profile: any) {
   const { data: drugs } = await drugQuery;
   const drugIds = (drugs ?? []).map((d) => d.id);
 
-  const [{ data: exploits }, { data: prices }, { data: accumulators }] =
+  const [{ data: exploits }, { data: prices }, { data: accumulators }, { data: counterGuidance }] =
     await Promise.all([
       supabase().from('exploits').select('*, sources(*)').in('drug_id', drugIds).eq('status', 'active'),
       supabase().from('price_points').select('*, sources(*)').in('drug_id', drugIds),
       supabase().from('accumulator_policies').select('*, sources(*)'),
+      // Tiny reference table (9 rows), always included: counter rejections
+      // are reported mid-conversation, not asked about by drug name.
+      supabase().from('counter_override_guidance').select('*, sources(*)'),
     ]);
 
-  return { profile, medications, exploits, prices, accumulators };
+  return { profile, medications, exploits, prices, accumulators, counterGuidance };
 }
 
 // --- Step 3: grounded response, only speaks from retrieved context ---
@@ -191,6 +195,14 @@ RETRIEVED_CONTEXT: ${JSON.stringify({
     exploits: context.exploits,
     prices: context.prices,
     accumulators: context.accumulators,
+    counter_guidance: context.counterGuidance,
+    // Manufacturer copay cards already removed by the AKS hard-block for
+    // government-coverage patients; listed here ONLY so the model can say
+    // accurately why they're absent - never as options.
+    blocked_pathways: (context.blockedCards ?? []).map((e: any) => ({
+      title: e.title,
+      reason: COPAY_CARD_BLOCK_REASON,
+    })),
   })}
 CONVERSATION_HISTORY: ${JSON.stringify(history)}
 USER_MESSAGE: ${userMessage}
@@ -259,16 +271,32 @@ export async function POST(req: Request) {
 
   const context = await retrieveContext(userId, intent, profile);
 
+  // AKS hard-block (lib/medicareEligibility.ts): manufacturer copay cards
+  // are federally illegal for Medicare/Medicaid patients. They leave the
+  // viable set entirely, and the patient is told why by this deterministic
+  // string - code-level, never model-optional, never silently omitted.
+  const { viable, blocked } = partitionCopayCardsForInsurance(
+    context.exploits ?? [],
+    profile?.insurance_type,
+  );
+  const blockedNote = blocked.length > 0
+    ? `\n\nWhy you're not seeing a manufacturer copay card here: ${COPAY_CARD_BLOCK_REASON} ` +
+      `Blocked for your coverage: ${blocked.map((e: any) => e.title).join('; ')}. ` +
+      'The legal pathways for your coverage are the non-card options - patient assistance programs, foundation grants, and similar programs.'
+    : '';
+  const modelContext = { ...context, exploits: viable, blockedCards: blocked };
+
   // Empty-retrieval short-circuit (locked 2026-07-24): when nothing
   // drug-specific came back, answer deterministically in code instead of
   // calling the response model with an empty context and trusting the
-  // prompt to hold the line. accumulator_policies alone don't count as
+  // prompt to hold the line. accumulator_policies and
+  // counter_override_guidance alone don't count as
   // coverage - a savings answer needs at least one drug-specific row
   // (exploit or price point); general policy rows invite free-association.
   const nothingDrugSpecific =
-    (context.exploits ?? []).length === 0 && (context.prices ?? []).length === 0;
+    viable.length === 0 && (context.prices ?? []).length === 0;
   if (nothingDrugSpecific) {
-    const response = STRINGS.noData[lang](intent.drug_name);
+    const response = STRINGS.noData[lang](intent.drug_name) + blockedNote;
     await supabase().from('chat_messages').insert([
       { session_id: sessionId, role: 'user', content: message },
       { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: [] },
@@ -282,9 +310,9 @@ export async function POST(req: Request) {
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true });
 
-  const response = await generateResponse(message, context, history ?? [], lang);
+  const response = (await generateResponse(message, modelContext, history ?? [], lang)) + blockedNote;
 
-  const retrievedIds = (context.exploits ?? []).map((e: any) => e.id);
+  const retrievedIds = viable.map((e: any) => e.id);
   await supabase().from('chat_messages').insert([
     { session_id: sessionId, role: 'user', content: message },
     { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: retrievedIds },

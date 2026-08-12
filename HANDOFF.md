@@ -61,7 +61,7 @@ confirm pattern). AGENTS.md holds OpenCode-specific working instructions.
 None of these define database tables, but read them before building the
 corresponding feature.
 
-## What's actually in schema.sql (31 tables)
+## What's actually in schema.sql (32 tables)
 
 Grouped by the doc that specs them:
 
@@ -79,7 +79,9 @@ Grouped by the doc that specs them:
   `drugs`, `user_medications`, `price_points`, `exploits` (now includes
   `underlying_processor`/BIN/PCN fields per
   BLUE_BUTTON_AND_DISCOUNT_GRAPH.md and
-  PHARMACIST_AND_REVCYCLE_FORMATS.md), `accumulator_policies`
+  PHARMACIST_AND_REVCYCLE_FORMATS.md), `accumulator_policies`,
+  `counter_override_guidance` (db/012: NCPDP 308-C8 counter-rejection
+  checklist, source_id NOT NULL at the DB level)
 - **Bill auditor / denial appeals / charity care** (Phase 1.5 parallel
   track, README.md): `uploaded_documents`, `bill_audit_findings` (now
   includes `cpt_hcpcs_code`), `denial_appeals`,

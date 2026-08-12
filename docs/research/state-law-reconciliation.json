@@ -1,0 +1,1933 @@
+{
+  "generated": "2026-08-12T00:05:51.424Z",
+  "passes": [
+    "docs/research/state-law-pass-1.md",
+    "docs/research/state-law-pass-2.md",
+    "docs/research/state-law-pass-3.md"
+  ],
+  "records": [
+    {
+      "code": "AL",
+      "name": "Alabama",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "NCSL / AIDS Institute secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "AK",
+      "name": "Alaska",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "NCSL / AIDS Institute secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "AZ",
+      "name": "Arizona",
+      "seed": "yes",
+      "bucket": "Agree",
+      "citation_status": "compatible",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "Ariz. Rev. Stat. § 20-1126 (HB 2166)",
+        "effective_date": "Dec 31, 2019",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Limited to brand drugs without a generic equivalent or via prior auth",
+        "source": "CGA/NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic, or generic with PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Ariz. Rev. Stat. § 20-1126 (or § 20-1126 / related)",
+        "effective_date": "~2020",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Often when no generic available",
+        "source": "CT OLR 2024-R-0034; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "AR",
+      "name": "Arkansas",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "Ark. Code Ann. § 23-79-114 (HB 1569)",
+        "effective_date": "Jan 1, 2022",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Carve-out for brand drugs with an FDA-approved generic available",
+        "source": "NCSL / AR Code",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Brand exclusion when not medically necessary and medically appropriate generic exists",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Ark. Code Ann. § 23-79-2303 (earlier refs to § 23-79-2103)",
+        "effective_date": "~2021–2022",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Varies",
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "CA",
+      "name": "California",
+      "seed": "no",
+      "bucket": "Disagree",
+      "citation_status": "n/a",
+      "note": "p1 offers a specific 2025 citation (AB 2180, two code sections); p2/p3 found nothing in core lists. Seed says no. One legislature-site lookup settles this — verify first (large state).",
+      "p1": {
+        "has_law": "Y",
+        "citation": "Cal. Ins. Code § 10123.208 / Health & Safety Code § 1367.007 (AB 2180)",
+        "effective_date": "Jan 1, 2025",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Carve-out if generic equivalent is available and medically appropriate",
+        "source": "CA Legislature",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "AIDS Institute / NCSL secondary",
+        "implied": false,
+        "raw": "N (no full ban noted in core lists)"
+      }
+    },
+    {
+      "code": "CO",
+      "name": "Colorado",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "C.R.S. § 10-16-148 (SB 23-195)",
+        "effective_date": "Jan 1, 2024",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies if no generic equivalent or biosimilar exists",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic/biosimilar, or access via PA, step therapy, or other approval",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Colo. Rev. Stat. § 10-16-161",
+        "effective_date": "~2023",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Common generic carve-out language",
+        "source": "NCSL; CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "CT",
+      "name": "Connecticut",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "Conn. Gen. Stat. § 38a-510c (PA 21-14)",
+        "effective_date": "Jan 1, 2022",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies to covered Rx benefits; no generic exception mandated",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Conn. Gen. Stat. §§ 38a-477ff, -477gg, -478w",
+        "effective_date": "~2021–2022",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR primary-ish",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "DE",
+      "name": "Delaware",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "18 Del. C. § 3370A / § 3571S (HB 263)",
+        "effective_date": "Jan 1, 2025",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies when no generic equivalent is available",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Del. Code tit. 18 § 3382 / § 3382A",
+        "effective_date": "~2023–2024",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "DC",
+      "name": "District of Columbia",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "hedged",
+      "note": "p1 gives D.C. Code § 31-3303.14 (B 24-0738, 2023); p3 gives D.C. Law 25-26; p2 is unresolved (NCSL says DC has legislation, Triage had no row). Probably Y — confirm citation.",
+      "p1": {
+        "has_law": "Y",
+        "citation": "D.C. Code § 31-3303.14 (B 24-0738)",
+        "effective_date": "Mar 22, 2023",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies across covered outpatient specialty drugs",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "M",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "NCSL says DC has legislation, but Triage did not provide a DC row",
+        "implied": false,
+        "raw": "Unresolved"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "D.C. Law 25-26 (2023)",
+        "effective_date": "2023/2025",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR; AIDS Institute",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "FL",
+      "name": "Florida",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Multiple secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "GA",
+      "name": "Georgia",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "O.C.G.A. § 33-24-59.31 (HB 853)",
+        "effective_date": "Jan 1, 2022",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Generic carve-out applies unless physician orders brand",
+        "source": "GA Code",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic, or generic accessed via PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Ga. Code Ann. § 33-64-10(e)",
+        "effective_date": "~2020–2021",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Often generic-related",
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "HI",
+      "name": "Hawaii",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "ID",
+      "name": "Idaho",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "IL",
+      "name": "Illinois",
+      "seed": "yes",
+      "bucket": "Agree",
+      "citation_status": "compatible",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "215 ILCS 134/30 (PA 101-0452)",
+        "effective_date": "Jan 1, 2020",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Mandatory inclusion for all commercial state-regulated plans",
+        "source": "CGA/NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic distinction stated",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "215 Ill. Comp. Stat. Ann. § 134/30(d)",
+        "effective_date": "~2019–2020",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "IN",
+      "name": "Indiana",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": "All three say Y — NOT a Y/N disagreement (the ticket expected it to be). The conflict is legislative history: p1 cites HB 1149 (eff. 2023); p3 cites HB 1604 (2025, eff. after Dec 31 2025 — matches p2's date). Likely original law + later expansion; confirm which sections are live.",
+      "p1": {
+        "has_law": "Y",
+        "citation": "Ind. Code § 27-8-38 / § 27-13-38 (HB 1149)",
+        "effective_date": "July 1, 2023",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies to prescription drugs without a generic equivalent",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": "Plans issued/delivered/amended/renewed after Dec. 31, 2025",
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Covered, life-saving or chronic-pain drugs without approved generic",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "HB 1604 (2025) / related",
+        "effective_date": "After Dec 31, 2025 / 2025",
+        "erisa_scope": "Fully insured / state-regulated only; limited drug scope in some language",
+        "carve_outs": "Life-saving/chronic; no generic version",
+        "source": "Triage Cancer; bill trackers; NORD webinar",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "IA",
+      "name": "Iowa",
+      "seed": "yes",
+      "bucket": "Disagree",
+      "citation_status": "n/a",
+      "note": "p2+p3 say Y (SF 383, eff. July 1 2025); p1 omits IA (implied N, likely stale data). Seed already says yes. Likely a genuine 2025 enactment — confirm statute text.",
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": "July 1, 2025",
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "SF 383 (2025)",
+        "effective_date": "On/after July 1, 2025",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "Bill materials; advocacy letters",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "KS",
+      "name": "Kansas",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "KY",
+      "name": "Kentucky",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "KRS § 304.17A-163 (SB 45)",
+        "effective_date": "Jan 1, 2022",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Generic carve-out unless patient completes step-therapy/PA",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Brand with generic excluded unless PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Ky. Rev. Stat. Ann. § 304.17A-164",
+        "effective_date": "~",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "LA",
+      "name": "Louisiana",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "La. R.S. 22:1053 (SB 94)",
+        "effective_date": "Jan 1, 2022",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies broadly to third-party payments made on enrollee behalf",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "La. Stat. Ann. § 22:976.1",
+        "effective_date": "~",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "ME",
+      "name": "Maine",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "24-A M.R.S. § 4317-C (LD 1705)",
+        "effective_date": "Jan 1, 2023",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies if no generic equivalent is available on formulary",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Generic-equivalent drugs excluded; third-party aid program must notify patient within 7 days of available amount",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Me. Rev. Stat. Ann. tit. 24-A § 4349(6)",
+        "effective_date": "~2023",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Generic-related in some",
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "MD",
+      "name": "Maryland",
+      "seed": "yes",
+      "bucket": "Agree",
+      "citation_status": "compatible",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "Md. Code, Ins. § 15-859 (SB 773)",
+        "effective_date": "Jan 1, 2026",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Mandatory counting for brand products lacking generic alternatives",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": "Jan. 1, 2026; sunset July 1, 2029",
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Brand with generic excluded unless PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "SB 773 (2025)",
+        "effective_date": "2025",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Applies when no AB-rated generic or interchangeable biologic (or after prior auth/exceptions)",
+        "source": "AIDS Institute appendix; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "MA",
+      "name": "Massachusetts",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N (no full ban in core lists)"
+      }
+    },
+    {
+      "code": "MI",
+      "name": "Michigan",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "MN",
+      "name": "Minnesota",
+      "seed": "no",
+      "bucket": "Partial",
+      "citation_status": "hedged",
+      "note": "p3 hedges: \"regulatory / rate-filing effects noted; not full statutory ban\". p1/p2 say N. Treat as N unless a statute surfaces.",
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "M",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "NORD / AIDS Institute (regulatory)",
+        "implied": false,
+        "raw": "Regulatory / rate-filing effects noted; not full statutory ban in legislative lists"
+      }
+    },
+    {
+      "code": "MS",
+      "name": "Mississippi",
+      "seed": "no",
+      "bucket": "Partial",
+      "citation_status": "hedged",
+      "note": "p3 hedges: \"mixed/partial notes in some 2026 lists\" (inconsistent secondary). p1/p2 say N.",
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "M",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary (inconsistent)",
+        "implied": false,
+        "raw": "Mixed/partial notes in some 2026 lists"
+      }
+    },
+    {
+      "code": "MO",
+      "name": "Missouri",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "MT",
+      "name": "Montana",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "NE",
+      "name": "Nebraska",
+      "seed": "unknown",
+      "bucket": "Disagree",
+      "citation_status": "n/a",
+      "note": "p3 claims Neb. Rev. Stat. § 44-4606(5) via CT OLR; p1/p2 say no. Seed carries a pre-existing conflict flag (AIDS Institute 2026 omits NE). Must resolve against statute text.",
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Neb. Rev. Stat. § 44-4606(5)",
+        "effective_date": null,
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "NV",
+      "name": "Nevada",
+      "seed": "partial",
+      "bucket": "Disagree",
+      "citation_status": "n/a",
+      "note": "All three circle a REGULATORY (not statutory) mechanism: p2 says Y-but-regulation, p3 \"regulatory effects noted\", p1 implied N. Seed says partial. Needs a classification decision (separate mechanism class), not just a citation.",
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Coupons excluded from limits only where a generic is available",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "M",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "NORD secondary",
+        "implied": false,
+        "raw": "Regulatory effects noted"
+      }
+    },
+    {
+      "code": "NH",
+      "name": "New Hampshire",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "NJ",
+      "name": "New Jersey",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": "p1 cites N.J.S.A. 17B:27F-12 (A 536/S 1616); p3 cites S3818 (signed ~early 2026). Different bill numbers entirely. Seed note says signed Jan 13 2026. Confirm which act is live law.",
+      "p1": {
+        "has_law": "Y",
+        "citation": "N.J.S.A. 17B:27F-12 (A 536/S 1616)",
+        "effective_date": "Jan 1, 2026",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies to commercial plans; generic exception permitted",
+        "source": "Drug Channels",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "S3818 / related (signed ~early 2026)",
+        "effective_date": "2026",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "HSA/HDHP compatibility language",
+        "source": "WisBusiness / advocacy; fiscal estimate",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "NM",
+      "name": "New Mexico",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "NMSA 1978, § 59A-22-54 (HB 126)",
+        "effective_date": "Jan 1, 2024",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Requires all third-party payments to count toward cost-sharing",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "N.M. Stat. Ann. § 59A-22-53.3",
+        "effective_date": "~",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "NY",
+      "name": "New York",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "N.Y. Ins. Law § 3216(i)(36) (S 1350)",
+        "effective_date": "Jan 1, 2024",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies if drug lacks generic equivalent or via formulary exception",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Brand without generic; brand with generic only through PA/appeal; all generics",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "N.Y. Ins. Law § 3216(i)(37) (and related)",
+        "effective_date": "~2023",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "NC",
+      "name": "North Carolina",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "N.C.G.S. § 58-3-295 (SB 257)",
+        "effective_date": "Jan 1, 2023",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Generic carve-out unless brand is prior-authorized",
+        "source": "Triage Cancer",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic, or generic accessed via PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "N.C. Gen. Stat. § 58-56A-3(c1)",
+        "effective_date": "~2022",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Generic-related",
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "ND",
+      "name": "North Dakota",
+      "seed": "yes",
+      "bucket": "Disagree",
+      "citation_status": "n/a",
+      "note": "p2+p3 say Y (HB 1216, eff. 2025/2026); p1 omits ND (implied N, likely stale). Seed already says yes. Confirm statute text.",
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": "Jan. 1, 2026",
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic, or generic accessed via PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "HB 1216 (2025)",
+        "effective_date": "2025/2026",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "HDHP/HSA deductible language; generic notes",
+        "source": "AIDS Institute; bill materials",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "OH",
+      "name": "Ohio",
+      "seed": "pending",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "OK",
+      "name": "Oklahoma",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "36 O.S. § 6060.13b (HB 2678)",
+        "effective_date": "Nov 1, 2021",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Mandates crediting all third-party discounts for covered drugs",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Okla. Stat. tit. 36, § 1250.5(18)",
+        "effective_date": "~",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "OR",
+      "name": "Oregon",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "ORS 743B.820 (HB 3013)",
+        "effective_date": "Jan 1, 2025",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Carve-out applies if an AB-rated generic equivalent exists",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "Lower-cost generic alternative; exceptions described by NCSL as PA, step therapy, or appeals",
+        "source": "Triage/NCSL",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "HB 4113 (2024)",
+        "effective_date": "2024/2025",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Applies if no cheaper generic; exceptions process if generic exists",
+        "source": "AIDS Institute; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "PA",
+      "name": "Pennsylvania",
+      "seed": "no",
+      "bucket": "Disagree",
+      "citation_status": "n/a",
+      "note": "p1 claims 40 P.S. § 3811 (HB 1564) eff. Jan 1 2025; p2/p3 say no enacted law (seed note: HB 2226 merely introduced Feb 2026). Verify whether any 2025 PA enactment exists.",
+      "p1": {
+        "has_law": "Y",
+        "citation": "40 P.S. § 3811 (HB 1564)",
+        "effective_date": "Jan 1, 2025",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Broad requirement for state-regulated commercial plans",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "PR",
+      "name": "Puerto Rico",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": "All three say Y, but citations cannot be format-matched (p1: Act No. 129-2020; p3: Laws of P.R. 26 § 4.070(B)). Likely the same law — confirm.",
+      "p1": {
+        "has_law": "Y",
+        "citation": "Act No. 129-2020",
+        "effective_date": "Aug 13, 2020",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Mandatory credit for third-party copay assistance",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Territorial insurer/PBM scope; ERISA treatment not retrieved",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Laws of P.R. 26 § 4.070(B)",
+        "effective_date": null,
+        "erisa_scope": "Territory-regulated",
+        "carve_outs": null,
+        "source": "CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "RI",
+      "name": "Rhode Island",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N (in core lists)"
+      }
+    },
+    {
+      "code": "SC",
+      "name": "South Carolina",
+      "seed": "no",
+      "bucket": "Partial",
+      "citation_status": "hedged",
+      "note": "p3 hedges: \"partial/mixed in some lists\". Seed note: H.3934/S.330 pending as of Jan 2026. p1/p2 say N.",
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "M",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "Partial/mixed in some lists"
+      }
+    },
+    {
+      "code": "SD",
+      "name": "South Dakota",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "TN",
+      "name": "Tennessee",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "Tenn. Code Ann. § 56-7-2365 (HB 618)",
+        "effective_date": "Jan 1, 2022",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Carve-out for brand drugs with generic alternatives",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Tenn. Code Ann. § 56-7-3205",
+        "effective_date": null,
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "TX",
+      "name": "Texas",
+      "seed": "yes",
+      "bucket": "Agree",
+      "citation_status": "compatible",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "Tex. Ins. Code § 1369.0542 (HB 999)",
+        "effective_date": "Sept 1, 2023",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies if no generic equivalent or if exception approved",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic, or generic accessed through PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Tex. Gov. Code / Ins. Code § 1369.0542 (or related)",
+        "effective_date": "~2024",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Generic-related",
+        "source": "CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "UT",
+      "name": "Utah",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "VT",
+      "name": "Vermont",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "8 V.S.A. § 4089i (H. 726)",
+        "effective_date": "Jan 1, 2022",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Applies when no lower-cost generic equivalent is available",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic/interchangeable biologic, or access through PA, step therapy, or exception/appeal",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "H.233 / related (2024); builds on prior language",
+        "effective_date": "2024/2025",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "HSA/HDHP language",
+        "source": "AIDS Institute; legislative docs",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "VA",
+      "name": "Virginia",
+      "seed": "yes",
+      "bucket": "Agree",
+      "citation_status": "compatible",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "Va. Code § 38.2-3407.20 (HB 2515)",
+        "effective_date": "July 1, 2019",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "All third-party discounts must count toward cost-sharing",
+        "source": "CGA/NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated; HDHP restriction until minimum deductible met",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Va. Code Ann. § 38.2-3407.20",
+        "effective_date": "~2019–2020",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "WA",
+      "name": "Washington",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "RCW 48.43.049 (SB 5213)",
+        "effective_date": "Jan 1, 2025",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Generic carve-out applies unless brand is medically necessary",
+        "source": "NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No carve-out stated in reviewed chart",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "Wash. Rev. Code § 48.43.435",
+        "effective_date": "~2022–2023",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": "Generic-related",
+        "source": "CT OLR; NCSL",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "WV",
+      "name": "West Virginia",
+      "seed": "yes",
+      "bucket": "Partial",
+      "citation_status": "conflict",
+      "note": null,
+      "p1": {
+        "has_law": "Y",
+        "citation": "W. Va. Code § 33-15-4u (HB 2770)",
+        "effective_date": "July 1, 2019",
+        "erisa_scope": "Fully-insured only",
+        "carve_outs": "Direct requirement to apply assistance toward deductibles/OOP",
+        "source": "CGA/NCSL",
+        "implied": false
+      },
+      "p2": {
+        "has_law": "Y",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": "Fully insured/state regulated only",
+        "carve_outs": "No generic distinction stated",
+        "source": "Triage",
+        "implied": false,
+        "raw": "Y"
+      },
+      "p3": {
+        "has_law": "Y",
+        "citation": "W. Va. Code §§ 33-15-4t, 33-16-3ee, 33-25A-8t",
+        "effective_date": "~2019–2020",
+        "erisa_scope": "Fully insured / state-regulated only",
+        "carve_outs": null,
+        "source": "CT OLR",
+        "implied": false,
+        "raw": "Y"
+      }
+    },
+    {
+      "code": "WI",
+      "name": "Wisconsin",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Advocacy notes (pending bills)",
+        "implied": false,
+        "raw": "N"
+      }
+    },
+    {
+      "code": "WY",
+      "name": "Wyoming",
+      "seed": "no",
+      "bucket": "Agree",
+      "citation_status": "n/a",
+      "note": null,
+      "p1": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "pass-1 \"Other 25 States\" lump",
+        "implied": true
+      },
+      "p2": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Triage chart blank",
+        "implied": false,
+        "raw": "N identified"
+      },
+      "p3": {
+        "has_law": "N",
+        "citation": null,
+        "effective_date": null,
+        "erisa_scope": null,
+        "carve_outs": null,
+        "source": "Secondary",
+        "implied": false,
+        "raw": "N"
+      }
+    }
+  ]
+}

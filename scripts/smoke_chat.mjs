@@ -68,13 +68,42 @@ const { rows: [session] } = await pgClient.query(
 
 const token = await signIn('chat_smoke@example.invalid', 'smoke-pass-123');
 
+// Bounded fetch (standing rule: no unbounded waits). A stalled /api/chat
+// is a test failure with a clean report, never a session hang. 75s: real
+// calls take 20-40s (extraction + response model); >90s counts as a hang
+// per the operating rule.
+async function fetchBounded(url, options = {}, ms = 75_000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Warm the route before timing anything: Turbopack compiles /api/chat on
+// first hit (2026-08-12 hang). Unauthenticated POST compiles + 401s for free.
+try {
+  await fetchBounded(`${BASE}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }, 60_000);
+} catch { /* warm-up only */ }
+
 async function chat(message) {
-  const res = await fetch(`${BASE}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ message, sessionId: session.id }),
-  });
-  return { status: res.status, json: await res.json() };
+  try {
+    const res = await fetchBounded(`${BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message, sessionId: session.id }),
+    });
+    return { status: res.status, json: await res.json() };
+  } catch (e) {
+    if (e?.name === 'AbortError') {
+      console.log('FAIL  /api/chat did not respond within 30s — treating as a real failure, not a hang');
+      failures++;
+      return { status: 0, json: null };
+    }
+    throw e;
+  }
 }
 
 const usageBefore = await openrouterUsageUsd();

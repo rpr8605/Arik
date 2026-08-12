@@ -81,10 +81,10 @@ const list = await api('GET', `/api/cases/${caseId}/deadlines`);
 check('GET deadlines lists exactly the 1 stored deadline', list.status === 200 && (list.json?.deadlines ?? []).length === 1, `${(list.json?.deadlines ?? []).length} row(s)`);
 
 // 7. Identity write -> masked read (booleans, never values)
-const put = await api('PUT', '/api/identity', { userId: USER, fields: { full_name: 'Http Smoke', insurance_member_id: 'XYZ-123' } });
+const put = await api('PUT', '/api/identity', { userId: USER, fields: { full_name: 'Http Smoke', date_of_birth: '1970-01-01' } });
 check('PUT /api/identity saves + returns masked fields', put.status === 200 && put.json?.identity?.full_name === true && put.json?.identity?.email === false);
 const getId = await api('GET', `/api/identity?userId=${USER}`);
-check('GET /api/identity never returns plaintext values', getId.status === 200 && !JSON.stringify(getId.json).includes('Http Smoke') && !JSON.stringify(getId.json).includes('XYZ-123'));
+check('GET /api/identity never returns plaintext values', getId.status === 200 && !JSON.stringify(getId.json).includes('Http Smoke') && !JSON.stringify(getId.json).includes('1970-01-01'));
 
 // 8. Terminal state: close, then confirm reopening is illegal
 await api('PATCH', `/api/cases/${caseId}`, { to: 'submitted' });

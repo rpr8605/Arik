@@ -15,6 +15,29 @@ Arik database yet — see "Supabase target project" below.
 3. Complete `PRE_BUILD_CHECKLIST.md` and report findings to the user.
    Last full review: 2026-07-24 (passed; findings repaired same day).
 
+## Standing operational rule (2026-08-12 — permanent, not tied to one bug)
+
+Nothing gets more than 3–4 minutes before you stop and report, full stop.
+This applies to every category of wait — dev server startup, a fetch/API
+call, a database query, a firecrawl scrape, waiting on any external
+process.
+
+- Every bash tool call that could plausibly hang (starting a server,
+  polling a port, calling an API, running a script that makes network
+  calls) gets an explicit timeout parameter on the tool call itself, not
+  just internal logic hoping to bound it.
+- Every fetch() or network call inside any script you write or run gets
+  an AbortController with a real timeout — no exceptions, even in
+  "quick" scripts.
+- If something hasn't resolved in 3–4 minutes: stop retrying, stop
+  waiting, do NOT loop back and try the same thing again silently. Report
+  exactly what you tried, what the last known state was, and what you
+  think is stuck. Then wait for instruction — don't guess at a workaround
+  and keep going.
+- A clean "this failed/timed out" report is always better than a hang.
+  Three failed attempts logged in 12 minutes beats one silent hang that
+  eats 20+ minutes of nothing.
+
 ## Supabase target project (READ BEFORE ANY DB WORK)
 
 Arik's project is live: `iwayoxmpbueneagdkpzj` (schema + 002–005 applied
@@ -29,8 +52,15 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/005_can_access_case_security_definer.sql` →
 `db/006_conversational_extraction.sql` →
 `db/007_language_and_consent_ledger.sql` → `db/008_document_intake.sql`
-→ `db/009_data_retention.sql` (or `scripts/apply_db.mjs` then
-`scripts/run_sql.mjs` for 004+; 006–009 are idempotent).
+→ `db/009_data_retention.sql` → `db/011_reduced_if_maximizer_detected.sql`
+→ `db/012_counter_override_guidance.sql` → `db/013_eliquis_dtp_tiers.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–009 and
+011–013 are idempotent). Note: `010_state_accumulator_ban_laws.sql` exists
+at repo root, deliberately UNAPPLIED pending the state-law reconciliation
+(docs/build-plans/ — the state-law-reconciliation-plan doc). Apply order
+between 010 and 011–013 does not matter (011–013 touch only
+`exploits`/`price_points`/their own table; 010 is standalone), but 010
+must be reconciled before it loads.
 
 ## Authority and read order
 
@@ -81,7 +111,7 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 
 ## Key files and their status
 
-- `schema.sql` — 31 tables, single source of truth for the DB. Apply
+- `schema.sql` — 32 tables, single source of truth for the DB. Apply
   first on a fresh project.
 - `db/002_identity_crypto.sql` — pgcrypto extension + `encrypt_identity`/
   `decrypt_identity` helpers (service-role only). Widens
@@ -113,6 +143,11 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     (patient-confirmed only).
   - `mtm.ts` — MTM eligibility, pure `computeMtmEligibility()` (tested by
     `scripts/test_mtm.ts`) + DB loader `computeAndStoreMtmCheck()`.
+  - `medicareEligibility.ts` — the AKS hard-block: pure
+    `partitionCopayCardsForInsurance()` (tested by
+    `scripts/test_medicare.ts`). Manufacturer copay cards never surface for
+    Medicare/Medicaid patients; the block reason is appended
+    deterministically in code, never left to the model.
   - `extractedFacts.ts` — Feature A merge step (built 2026-07-28): every
     extracted fact → durable profile/case/med row immediately;
     contradictions park in `pending_fact_corrections` (never silent
@@ -151,14 +186,24 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   401/413/415, storage + expiry), `smoke_retention.mjs` (Feature D:
   resolved_at, extended-retention opt-in/out + ledger, raw-upload purge,
   pg_cron case purge + summary), `smoke_flow.mjs` (onboarding front
-  door e2e). Node scripts read
+  door e2e), `eval_fixtures.mjs` (the four complaint-pattern eval
+  fixtures; shape self-check when run directly, consumed by the Phase 5
+  harness), `check_staleness.mjs` (30-day freshness flag; exit 1 on any
+  stale exploit/source row — the manual version of ticket 1.4's monitor),
+  `reconcile_state_law_passes.mjs` (three-pass state-law diff → buckets +
+  review-priority doc; never touches the DB),
+  `test_medicare.ts` (pure AKS hard-block tests),
+  `smoke_medicare.mjs` (e2e: Medicare Part D + Eliquis → copay card
+  blocked, PAP surfaced, legal note visible). Node scripts read
   `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),
   `managed-patients`, `privacy` (DELETE all / PATCH clear category),
   `outcomes`, `corrections` (one-tap confirm/dismiss of pending fact
   corrections; whitelisted targets only), `preferences` (language GET/PUT;
-  en/es launch scope, every change ledgered), `cases/[id]/documents`
+  en/es launch scope, every change ledgered), `profile/insurance-type`
+  (PUT plan type only — member ID/group number are deliberately not
+  collected anywhere; session-authed; feeds the AKS hard-block), `cases/[id]/documents`
   (upload → storage → preprocess → extract → persist; failures kept as
   first-class 'failed' rows, 502), `managed-patients` PATCH
   (extended-retention opt-in/out, session-authed, ledgered),

@@ -223,9 +223,10 @@ create table user_medications (
 create table price_points (
   id uuid primary key default gen_random_uuid(),
   drug_id uuid references drugs(id),
-  price_type text not null,           -- 'list', 'ira_negotiated', 'cash_pay', 'nadac', 'medicare_part_d'
+  price_type text not null,           -- 'list', 'ira_negotiated', 'cash_pay', 'nadac', 'medicare_part_d', 'direct_to_patient' (db/013: manufacturer-run cash channel)
   dose text,
   supply_days int,
+  unit_count int,                     -- db/013: tablets/capsules per fill; distinguishes same-day-supply tiers (e.g. Eliquis DTP 60 vs 74 tabs, both 30-day)
   price_usd numeric,
   effective_date date,
   source_id uuid references sources(id),
@@ -251,6 +252,9 @@ create table exploits (
   group_id text,
   source_id uuid references sources(id),
   last_verified_at timestamptz,
+  -- db/011: do this program's terms reduce the card maximum when maximizer-
+  -- program enrollment is detected? null = not yet checked (NOT "no clause").
+  reduced_if_maximizer_detected boolean,
   created_at timestamptz default now()
 );
 
@@ -269,6 +273,23 @@ create table accumulator_policies (
 -- Nothing in `exploits` or `accumulator_policies` should be inserted
 -- without a source_id. Enforce at the application layer until you're
 -- ready for a DB constraint.
+
+-- db/012: pharmacy counter-reality checklist (NCPDP field 308-C8 Other
+-- Coverage Codes). Lets chat surface the legitimate resubmission path when
+-- a copay card/coupon bounces at the counter. source_id is NOT NULL here,
+-- unlike the older reference tables - new tables don't repeat the
+-- app-layer-only gap.
+create table counter_override_guidance (
+  id uuid primary key default gen_random_uuid(),
+  code_system text not null,           -- 'ncpdp_other_coverage_code' (field 308-C8)
+  code_value text not null,            -- '0'..'8'
+  official_definition text not null,   -- definition as published by the cited payer document
+  plain_language text not null,        -- what it means at the counter, in patient terms
+  counter_action text not null,        -- the legitimate verify/resubmit path for pharmacy staff
+  source_id uuid not null references sources(id),
+  created_at timestamptz default now(),
+  unique (code_system, code_value)
+);
 
 -- ============================================================
 -- BILL AUDITOR / DENIAL APPEALS / CHARITY CARE (Phase 1.5, parallel track)
