@@ -191,3 +191,12 @@ Plan changes forced by the reconciliation ticket (these WIN over Addendum 1 wher
 - **D — changed and SHIPPED.** All four Eliquis DTP tiers seeded via `db/013_eliquis_dtp_tiers.sql`: $345 (30-day/60 tabs), $426 (30-day/74 tabs), $690 (60-day), $1,035 (90-day) — `price_points.unit_count` added to split the two 30-day tiers; new `price_type='direct_to_patient'`. Sources row = BMS/Pfizer announcement (establishes the program; tier numbers from owner's verified pull — stated in the migration header). Applied + verified idempotent; schema.sql mirrored. **The folded evidence migration renumbers db/013 → db/014.**
 - **010 fixed pre-application** (owner-required): sources INSERT now uses `retrieved_at` (was nonexistent `retrieval_date`), drops the nonexistent `notes` column (text moved to a comment), and is URL-guarded for true idempotency. B3's `corroboration_count` + `source_pass_ids` columns added to the CREATE TABLE in the same pass.
 - **Ticket 1 approved as built**; `source_id NOT NULL` on new sourced tables is now the standing standard (already applied in db/012; db/014 will follow it).
+
+---
+
+# ADDENDUM 4 — 2026-08-12 (closing pass)
+
+- **Step 9 (outcome wiring) SHIPPED**: `db/014_case_outcomes_pharmacy.sql` applied (`case_outcomes.pharmacy_used`); terminal PATCHes return `outcome_confirmation_required`; `OutcomePrompt` on the case page records amount + pharmacy + timestamp and confirms in one tap; `shouldPromptOutcomeConfirmation()` pure + unit-tested (`test_outcomes.ts` 10/10); smoke_http extended (flag on terminal transition, record→confirm flow, privacy cascade verified) — ALL PASS. The evidence fold renumbers db/014 → **db/015**.
+- **Pre-demo items all closed**: AKS hard-block (lib/medicareEligibility.ts + smoke_medicare e2e ALL PASS), copy hedging rule, plan-type-only insurance entry (`/api/profile/insurance-type` + home selector; member-ID collection removed from the vault), temp-demo banner in layout.
+- **Standing rule now in AGENTS.md**: every wait bounded (tool-call timeouts, AbortController in scripts, Wait-Job pattern for e2e); the 30s-hang root cause was model latency (~30s/call), fixed with 75s bounds + route warm-up.
+- **Open decision for owner**: Vercel deploy verification blocked — CLI token invalid, no production URL recorded anywhere in the repo. main is pushed (85b020c + outcome-wiring commit); if git integration exists, the deploy auto-triggered, but it couldn't be observed from here.

@@ -88,9 +88,22 @@ check('GET /api/identity never returns plaintext values', getId.status === 200 &
 
 // 8. Terminal state: close, then confirm reopening is illegal
 await api('PATCH', `/api/cases/${caseId}`, { to: 'submitted' });
-await api('PATCH', `/api/cases/${caseId}`, { to: 'closed_by_patient' });
+const closed = await api('PATCH', `/api/cases/${caseId}`, { to: 'closed_by_patient' });
+check('terminal PATCH flags outcome_confirmation_required', closed.json?.outcome_confirmation_required === true, JSON.stringify(closed.json?.outcome_confirmation_required));
 const reopen = await api('PATCH', `/api/cases/${caseId}`, { to: 'gathering_evidence' });
 check('PATCH closed_by_patient -> gathering_evidence returns 409 (terminal)', reopen.status === 409, `status ${reopen.status}`);
+
+// 8b. Outcome confirmation loop: record pharmacy + amount, patient confirms
+const oc = await api('POST', '/api/outcomes', { caseId, fields: { revisedAmountOwedUsd: 0, pharmacyUsed: 'Costco' } });
+check('POST /api/outcomes records amount + pharmacy_used', oc.status === 201 && oc.json?.outcome?.pharmacy_used === 'Costco' && oc.json?.outcome?.revised_amount_owed_usd !== null, `status ${oc.status}`);
+const outcomeId = oc.json?.outcome?.id;
+check('new outcome starts unconfirmed (patient gate)', oc.json?.outcome?.patient_confirmed === false);
+const conf = await api('POST', '/api/outcomes', { outcomeId, patientConfirmed: true });
+check('patient confirmation flips patient_confirmed', conf.status === 200 && conf.json?.outcome?.patient_confirmed === true, `status ${conf.status}`);
+check('confirmed outcome carries a timestamp', Boolean(conf.json?.outcome?.created_at));
+// (The "prompt silenced after confirmation" case is covered by the pure
+// unit tests — a terminal case legally rejects further PATCHes, so the
+// negative path can't be re-exercised over HTTP.)
 
 // 9. Privacy deletion removes everything the user touched
 const del = await api('DELETE', `/api/privacy?userId=${USER}`);

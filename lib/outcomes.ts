@@ -1,8 +1,29 @@
 import { supabaseAdmin } from './supabaseAdmin';
+import { RESOLVED_STATUSES } from './cases';
 
 // Outcome verification (CASE_MODEL.md): required before any success fee,
 // never a yes/no. A row only counts as verified savings when
 // patient_confirmed is true.
+
+// Pure decision (unit-tested by scripts/test_outcomes.ts): the outcome-
+// confirmation prompt shows exactly when a case has reached a terminal
+// status and no patient-confirmed outcome exists yet.
+export function shouldPromptOutcomeConfirmation(
+  status: string,
+  hasConfirmedOutcome: boolean,
+): boolean {
+  return (RESOLVED_STATUSES as readonly string[]).includes(status) && !hasConfirmedOutcome;
+}
+
+export async function hasConfirmedOutcome(caseId: string): Promise<boolean> {
+  const { count, error } = await supabaseAdmin()
+    .from('case_outcomes')
+    .select('id', { count: 'exact', head: true })
+    .eq('case_id', caseId)
+    .eq('patient_confirmed', true);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
 
 export async function recordOutcome(
   caseId: string,
@@ -16,6 +37,7 @@ export async function recordOutcome(
     causedByArik?: boolean;
     isRecurring?: boolean;
     arikConfidence?: 'high' | 'medium' | 'low';
+    pharmacyUsed?: string;
   },
 ) {
   const { data, error } = await supabaseAdmin()
@@ -31,6 +53,7 @@ export async function recordOutcome(
       caused_by_arik: fields.causedByArik ?? null,
       is_recurring: fields.isRecurring ?? null,
       arik_confidence: fields.arikConfidence ?? null,
+      pharmacy_used: fields.pharmacyUsed ?? null,
       patient_confirmed: false,
     })
     .select()

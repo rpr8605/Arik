@@ -72,7 +72,9 @@ Grouped by the doc that specs them:
 - **Caregiver mode** (CAREGIVER_MODE.md): `managed_patients` (+
   `extended_retention` recurring-care opt-in), `authorizations_on_file`
 - **Case model** (CASE_MODEL.md): `cases` (+ `resolved_at` retention
-  clock), `deadlines`, `escalations`, `case_outcomes`, `case_summaries`
+  clock), `deadlines`, `escalations`, `case_outcomes` (+
+  `pharmacy_used`, patient-confirmation prompt on terminal transitions),
+  `case_summaries`
   (DATA_RETENTION.md's surviving aggregate at purge time), plus
   evidence-freshness columns on `sources`
 - **Drug pricing** (Phase 1 core, README.md/seed_drugs.json):

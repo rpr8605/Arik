@@ -143,8 +143,9 @@ export async function listCases(userId: string): Promise<ArikCase[]> {
 // Terminal statuses that start the retention clock (DATA_RETENTION.md:
 // 90 days post-resolution, working default pending Hunter/legal review).
 // All three are terminal in ALLOWED_TRANSITIONS, so resolved_at is set
-// exactly once and never needs clearing.
-const RESOLVED_STATUSES: readonly CaseStatus[] = ['resolved_won', 'resolved_lost', 'closed_by_patient'];
+// exactly once and never needs clearing. Exported for the outcome-
+// confirmation prompt decision (lib/outcomes.ts).
+export const RESOLVED_STATUSES: readonly CaseStatus[] = ['resolved_won', 'resolved_lost', 'closed_by_patient'];
 
 export async function transitionCase(
   id: string,

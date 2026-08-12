@@ -3,8 +3,10 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getCase } from '@/lib/cases';
+import { hasConfirmedOutcome, shouldPromptOutcomeConfirmation } from '@/lib/outcomes';
 import { Thread } from './Thread';
 import { DocumentUpload } from './DocumentUpload';
+import { OutcomePrompt } from './OutcomePrompt';
 
 export default async function CasePage({
   params,
@@ -34,6 +36,13 @@ export default async function CasePage({
 
   const kase = await getCase(id);
   if (!kase) return <main><p>Case not found.</p></main>;
+
+  // Outcome-confirmation prompt: exactly when terminal + nothing
+  // patient-confirmed yet (pure decision in lib/outcomes.ts).
+  const showOutcomePrompt = shouldPromptOutcomeConfirmation(
+    kase.status,
+    await hasConfirmedOutcome(id),
+  );
 
   const { data: session } = await supabaseAdmin()
     .from('chat_sessions')
@@ -65,6 +74,7 @@ export default async function CasePage({
           (a summary of the outcome is kept).
         </p>
       ) : null}
+      {showOutcomePrompt ? <OutcomePrompt caseId={id} /> : null}
       <DocumentUpload caseId={id} />
       {session ? (
         <Thread

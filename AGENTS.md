@@ -54,8 +54,9 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/007_language_and_consent_ledger.sql` → `db/008_document_intake.sql`
 → `db/009_data_retention.sql` → `db/011_reduced_if_maximizer_detected.sql`
 → `db/012_counter_override_guidance.sql` → `db/013_eliquis_dtp_tiers.sql`
+→ `db/014_case_outcomes_pharmacy.sql`
 (or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–009 and
-011–013 are idempotent). Note: `010_state_accumulator_ban_laws.sql` exists
+011–014 are idempotent). Note: `010_state_accumulator_ban_laws.sql` exists
 at repo root, deliberately UNAPPLIED pending the state-law reconciliation
 (docs/build-plans/ — the state-law-reconciliation-plan doc). Apply order
 between 010 and 011–013 does not matter (011–013 touch only
@@ -140,7 +141,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     values).
   - `caregivers.ts`, `privacy.ts` (full deletion cascade + per-category
     demographic clearing; clears are consent-ledgered), `outcomes.ts`
-    (patient-confirmed only).
+    (patient-confirmed only; `pharmacy_used` per db/014; pure
+    `shouldPromptOutcomeConfirmation()` gates the terminal-transition
+    prompt — tested by `scripts/test_outcomes.ts`).
   - `mtm.ts` — MTM eligibility, pure `computeMtmEligibility()` (tested by
     `scripts/test_mtm.ts`) + DB loader `computeAndStoreMtmCheck()`.
   - `medicareEligibility.ts` — the AKS hard-block: pure
@@ -168,9 +171,11 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   - `session.ts` — `getUserId(req)`: Bearer JWT or cookie session →
     userId, else null (→ 401). Used by `/api/chat` and `/api/cases/start`.
 - `app/` — `login` (magic link + password), `auth/callback`, `page.tsx`
-  (case list + "what's going on?" front door), `cases/[id]` (+ Thread
-  client comp), `api/cases/start` (creates case + session from free
-  text; keyword-type heuristic is a visible filing aid). `proxy.ts`
+  (case list + "what's going on?" front door + `PlanTypeSelector`
+  coverage control), `cases/[id]` (+ Thread, DocumentUpload,
+  OutcomePrompt client comps), `api/cases/start` (creates case + session
+  from free text; keyword-type heuristic is a visible filing aid).
+  `layout.tsx` carries the temp-demo banner. `proxy.ts`
   refreshes the auth cookie (Next 16's name for middleware).
 - `scripts/` — `validate_repo.py` (structural gate), `apply_db.mjs`
   (fresh-project schema apply + verify), `run_sql.mjs` (apply one file),
@@ -194,7 +199,8 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   review-priority doc; never touches the DB),
   `test_medicare.ts` (pure AKS hard-block tests),
   `smoke_medicare.mjs` (e2e: Medicare Part D + Eliquis → copay card
-  blocked, PAP surfaced, legal note visible). Node scripts read
+  blocked, PAP surfaced, legal note visible),
+  `test_outcomes.ts` (pure outcome-prompt decision tests). Node scripts read
   `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),

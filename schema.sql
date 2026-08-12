@@ -169,6 +169,7 @@ create table case_outcomes (
   is_recurring boolean,
   patient_confirmed boolean default false,
   arik_confidence text,               -- mirrors evidence_grade style: high/medium/low
+  pharmacy_used text,                 -- db/014: where the patient actually filled, per their confirmation
   created_at timestamptz default now()
 );
 

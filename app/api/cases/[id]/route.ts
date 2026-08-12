@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCase, transitionCase, IllegalTransitionError, CASE_STATUSES, type CaseStatus } from '@/lib/cases';
+import { getCase, transitionCase, IllegalTransitionError, CASE_STATUSES, RESOLVED_STATUSES, type CaseStatus } from '@/lib/cases';
+import { hasConfirmedOutcome, shouldPromptOutcomeConfirmation } from '@/lib/outcomes';
 
 // AUTH NOTE: see app/api/cases/route.ts - auth guard lands with Phase 1.
 
@@ -28,7 +29,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       nextAction: body.nextAction,
       nextActionDue: body.nextActionDue,
     });
-    return NextResponse.json({ case: updated });
+    // Terminal transitions carry the outcome-confirmation signal (build
+    // plan step 9): the KPI loop counts only patient-confirmed outcomes,
+    // so the client must be told to ask. Only queried on terminal status.
+    const outcomeConfirmationRequired = (RESOLVED_STATUSES as readonly string[]).includes(updated.status)
+      ? shouldPromptOutcomeConfirmation(updated.status, await hasConfirmedOutcome(id))
+      : false;
+    return NextResponse.json({ case: updated, outcome_confirmation_required: outcomeConfirmationRequired });
   } catch (e) {
     if (e instanceof IllegalTransitionError) {
       return NextResponse.json({ error: e.message }, { status: 409 });
