@@ -6,3 +6,4 @@ node_modules/
 
 dev-server.log
 tsconfig.tsbuildinfo
+.vercel
