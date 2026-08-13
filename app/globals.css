@@ -1,0 +1,134 @@
+/* Arik global stylesheet — created 2026-08-12 after the "zero styling"
+   diagnosis: the app previously had NO CSS at all (inline style={{}}
+   attributes only). This is the base layer: typography, layout, form
+   elements. Component-level inline styles continue to work on top. */
+
+:root {
+  --arik-ink: #1a2233;
+  --arik-muted: #5a6478;
+  --arik-brand: #2b5fd9;
+  --arik-brand-dark: #1e46a8;
+  --arik-bg: #f7f8fa;
+  --arik-card: #ffffff;
+  --arik-border: #d8dde6;
+  --arik-alert-bg: #fff3cd;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--arik-bg);
+  color: var(--arik-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 1rem 0 0.75rem;
+}
+
+h2 {
+  font-size: 1.2rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+a {
+  color: var(--arik-brand);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input[type="submit"] {
+  background: var(--arik-brand);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1.1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--arik-brand-dark);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Secondary/plain buttons that sit next to a primary action */
+button[type="button"] {
+  background: #fff;
+  color: var(--arik-brand);
+  border: 1px solid var(--arik-border);
+}
+
+button[type="button"]:hover:not(:disabled) {
+  background: #eef2fb;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 1rem;
+  border: 1px solid var(--arik-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--arik-ink);
+}
+
+input[type="radio"],
+input[type="checkbox"] {
+  margin-right: 0.25rem;
+}
+
+label {
+  font-weight: 500;
+}
+
+section[aria-label] {
+  background: var(--arik-card);
+  border-radius: 8px;
+}
+
+/* Chat thread legibility */
+[aria-live="polite"] > div {
+  padding: 0.35rem 0;
+}
+
+/* Screen-reader-only utility (used by form labels) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -1,3 +1,5 @@
+import './globals.css';
+
 export const metadata = {
   title: 'Arik',
   description: 'Patient-side healthcare cost advocate',
