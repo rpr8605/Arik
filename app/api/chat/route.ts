@@ -18,6 +18,7 @@ import { callModel } from '@/lib/callModel';
 import { getUserId } from '@/lib/session';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON } from '@/lib/medicareEligibility';
+import { rankSavingsPathsForDrug } from '@/lib/ranking';
 
 // Created lazily per call - a module-level client crashes Next's
 // build-time page-data collection when env vars aren't present.
@@ -173,7 +174,9 @@ async function retrieveContext(userId: string, intent: Intent, profile: any) {
 
   const [{ data: exploits }, { data: prices }, { data: accumulators }, { data: counterGuidance }] =
     await Promise.all([
-      supabase().from('exploits').select('*, sources(*)').in('drug_id', drugIds).eq('status', 'active'),
+      // db/017 added a second sources FK (aks/terms citations) — the embed
+      // must name the FK or PostgREST rejects it as ambiguous.
+      supabase().from('exploits').select('*, sources!exploits_source_id_fkey(*)').in('drug_id', drugIds).eq('status', 'active'),
       supabase().from('price_points').select('*, sources(*)').in('drug_id', drugIds),
       supabase().from('accumulator_policies').select('*, sources(*)'),
       // Tiny reference table (9 rows), always included: counter rejections
@@ -203,6 +206,10 @@ RETRIEVED_CONTEXT: ${JSON.stringify({
       title: e.title,
       reason: COPAY_CARD_BLOCK_REASON,
     })),
+    // The ranking engine's output. When present, the model presents
+    // pathways in THIS order with THESE notes - it does not re-rank or
+    // revive blocked/pending rows as options (prompt rule).
+    ranked_pathways: context.rankedPathways ?? null,
   })}
 CONVERSATION_HISTORY: ${JSON.stringify(history)}
 USER_MESSAGE: ${userMessage}
@@ -284,7 +291,27 @@ export async function POST(req: Request) {
       `Blocked for your coverage: ${blocked.map((e: any) => e.title).join('; ')}. ` +
       'The legal pathways for your coverage are the non-card options - patient assistance programs, foundation grants, and similar programs.'
     : '';
-  const modelContext = { ...context, exploits: viable, blockedCards: blocked };
+  const modelContext: Record<string, any> = { ...context, exploits: viable, blockedCards: blocked };
+
+  // The ranking engine (lib/ranking.ts): deterministic pathway ordering
+  // with 3-12 month trajectory costs. Runs only when something drug-
+  // specific exists to rank; its output drives the response's pathway
+  // order — the model presents it, it does not invent its own ranking.
+  const ranking =
+    viable.length > 0 || (context.prices ?? []).length > 0
+      ? await rankSavingsPathsForDrug({
+          drugName: intent.drug_name ?? '',
+          patient: {
+            insuranceType: profile?.insurance_type ?? null,
+            stateCode: profile?.state ?? null,
+            incomePctFpl: profile?.income_pct_fpl ?? null,
+            householdSize: profile?.household_size ?? null,
+          },
+          exploits: context.exploits ?? [],
+          pricePoints: context.prices ?? [],
+        })
+      : null;
+  modelContext.rankedPathways = ranking;
 
   // Empty-retrieval short-circuit (locked 2026-07-24): when nothing
   // drug-specific came back, answer deterministically in code instead of
@@ -318,7 +345,7 @@ export async function POST(req: Request) {
     { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: retrievedIds },
   ]);
 
-  return Response.json({ response, sources: context.exploits, corrections });
+  return Response.json({ response, sources: context.exploits, corrections, ranked_pathways: ranking });
 }
 
 let cachedPrompt: string | null = null;

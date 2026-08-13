@@ -47,6 +47,7 @@ create table user_matching_profile (
   state_or_location_raw text,        -- raw location text as extracted ("Austin, TX"); zip_code/state are resolved from it deterministically in code
   preferred_language text default 'en', -- per UNIVERSAL_ACCESS.md: full-conversation language, generated directly not translated. Launch scope: 'en'/'es' only (non-English extraction quality unvalidated - launch decision, not technical)
   income_bracket text,               -- optional, only if patient wants PAP/charity-care matching
+  income_pct_fpl numeric,            -- db/015: numeric %FPL; screener/ranking logic reads THIS, never the bracket text
   household_size int,                -- optional, same opt-in pattern as income
   preferred_pharmacy text,
   employer_name text,                -- optional, for EMPLOYER_PLAN_DATABASE.md matching
@@ -256,6 +257,42 @@ create table exploits (
   -- db/011: do this program's terms reduce the card maximum when maximizer-
   -- program enrollment is detected? null = not yet checked (NOT "no clause").
   reduced_if_maximizer_detected boolean,
+  -- db/016: referral_only rows (340B-type entries, some population pathways)
+  -- may NEVER carry a dollar figure; the CHECK makes that a DB rule.
+  referral_only boolean not null default false,
+  -- db/017 (evidence fold): verification + price semantics. The hard rule
+  -- lives as triggers in db/017: no non-'conflicted' verification_status
+  -- while an open evidence_conflicts row exists; only a human setting
+  -- resolved_value/resolved_at clears it.
+  verification_status text not null default 'unresolved'
+    check (verification_status in ('verified_current','verified_historical','conflicted','unresolved')),
+  patient_price_type text check (patient_price_type in ('as_low_as','flat','range')),
+  patient_price_floor numeric,        -- "as low as $X" is not "$X" — patient_price_type says which
+  annual_max_savings numeric,
+  monthly_max_savings numeric,
+  field_confidence jsonb,
+  superseded_by uuid references exploits(id),
+  medicare_exclusion_reason text
+    check (medicare_exclusion_reason in ('aks_statutory','manufacturer_terms','both','none','unknown')),
+  aks_citation_source_id uuid references sources(id),
+  terms_citation_source_id uuid references sources(id),
+  created_at timestamptz default now(),
+  constraint exploits_referral_only_no_dollars check (referral_only = false or estimated_savings_usd is null)
+);
+
+-- db/017: conflicting evidence is captured, never silently resolved.
+create table evidence_conflicts (
+  id uuid primary key default gen_random_uuid(),
+  exploit_id uuid not null references exploits(id),
+  field_name text not null,
+  value_a text,
+  value_b text,
+  source_a_id uuid references sources(id),
+  source_b_id uuid references sources(id),
+  reason text,
+  resolved_at timestamptz,             -- null = open
+  resolved_value text,                 -- set ONLY by a human
+  resolution_note text,
   created_at timestamptz default now()
 );
 
@@ -290,6 +327,71 @@ create table counter_override_guidance (
   source_id uuid not null references sources(id),
   created_at timestamptz default now(),
   unique (code_system, code_value)
+);
+
+-- db/010: state copay-accumulator ban matrix. Loaded 2026-08-12 with
+-- owner-verified demo states (IA/ND = primary_source_verified yes, CA =
+-- primary_source_verified no, NV = unknown pending a classification call);
+-- the other 48 rows stay secondary_aggregated with corroboration data
+-- from the three-pass reconciliation. Helpers get_state_ban_type() and
+-- state_has_accumulator_ban() live in db/010 — the SQL function has NO
+-- confidence awareness: every caller must also read verification_status
+-- before rendering (owner rule, Addendum 3 answer A).
+create table state_accumulator_ban_laws (
+  state_code text primary key,
+  jurisdiction_name text not null,
+  jurisdiction_type text not null check (jurisdiction_type in ('state','district','territory')),
+  ban_enacted text not null check (ban_enacted in ('yes','no','pending','partial','unknown')) default 'unknown',
+  ban_type text not null check (ban_type in ('outright','no_generic_only','no_generic_no_biosimilar','maximizer_only','none','unknown','regulatory_guidance')) default 'unknown',
+  applies_to_market text,              -- self-funded/ERISA plans are federally exempt regardless
+  covers_maximizers text not null check (covers_maximizers in ('yes','no','unknown')) default 'unknown',
+  source_id uuid references sources(id),
+  verification_status text not null check (verification_status in ('primary_source_verified','secondary_aggregated','unknown')) default 'secondary_aggregated',
+  corroboration_count int,             -- how many of the 3 research passes agree
+  source_pass_ids jsonb,               -- per-pass claimed answer + citation
+  notes text,
+  last_reviewed_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- ELIGIBILITY SCREENERS (db/015 + db/016, 2026-08-12)
+-- Benefits that reprice a whole regimen or reroute the patient to another
+-- coverage system - not per-drug exploits. No race/ethnicity field
+-- anywhere: zero programs gate on it (research pass 2026-08-12).
+-- user_matching_profile.income_pct_fpl (db/015) feeds the income gates.
+-- ============================================================
+
+create table eligibility_programs (
+  id uuid primary key default gen_random_uuid(),
+  program_key text unique not null,      -- 'extra_help_lis', 'ihs_health', 'nbccedp', ...
+  display_name text not null,
+  category text not null check (category in ('regimen_benefit','population_pathway')),
+  administering_body text,
+  eligibility_rules jsonb,               -- income/asset/age/status gates, machine-readable
+  benefit_summary text not null,         -- no dollar figures on referral_only rows
+  referral_only boolean not null default false,
+  channel_restriction text,              -- e.g. 'ihs_tribal_urban_pharmacy_only'; null = none
+  screening_data_policy text not null default 'persist_profile'
+    check (screening_data_policy in ('persist_profile','ephemeral_only')),  -- 'ephemeral_only' codifies IMMIGRATION_STATUS_HANDLING.md at row level
+  requires_legal_status_caveat boolean not null default false,
+  render_caveat text,
+  check (requires_legal_status_caveat = false or render_caveat is not null),
+  source_id uuid not null references sources(id),
+  last_verified_at timestamptz,
+  effective_date date,
+  created_at timestamptz default now()
+);
+
+-- Per-user screening outcomes; 'likely_*' language, never hard booleans
+-- (same posture as the MTM threshold decision).
+create table patient_eligibility_results (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  program_key text references eligibility_programs(program_key),
+  result text not null check (result in ('likely_eligible','likely_not','insufficient_info')),
+  basis jsonb,
+  computed_at timestamptz default now()
 );
 
 -- ============================================================

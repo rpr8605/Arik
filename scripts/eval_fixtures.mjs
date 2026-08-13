@@ -111,3 +111,74 @@ for (const f of COMPLAINT_PATTERN_FIXTURES) {
 if (failures > 0) process.exit(1);
 console.log(`${COMPLAINT_PATTERN_FIXTURES.length} complaint-pattern fixtures, all well-formed:`);
 for (const f of COMPLAINT_PATTERN_FIXTURES) console.log(` - ${f.id}`);
+
+// ---------------------------------------------------------------------------
+// DB-backed fixture: the Zepbound non-covered-commercial conflict.
+// Owner-defined expected behavior (2026-08-12 ticket): the pipeline must
+// hold this pathway at verification_status='conflicted' with a NULL trusted
+// annual max and BOTH disputed figures captured in an open
+// evidence_conflicts row — never a guessed number — until a human sets
+// resolved_value. This is the permanent "the pipeline refuses to guess"
+// regression test. Runs only when this file is executed directly.
+// ---------------------------------------------------------------------------
+export const ZEPBOUND_CONFLICT_FIXTURE = {
+  id: 'zepbound_not_covered_conflict',
+  drug: 'Zepbound',
+  pathway_title: 'Zepbound Savings Card (commercial, drug not covered)',
+  disputed_field: 'annual_max_savings',
+  disputed_values: ['3283', '6097'],
+  expected: {
+    verification_status: 'conflicted',
+    trusted_value: null,
+    open_conflict_with_both_values: true,
+    gate_rejects_verified_current: true,
+  },
+};
+
+const isMain = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('eval_fixtures.mjs');
+if (isMain) {
+  const { readFileSync } = await import('node:fs');
+  const pg = (await import('pg')).default;
+  const env = {};
+  for (const line of readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/i);
+    if (m && !m[1].startsWith('#')) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
+  }
+  const client = new pg.Client({
+    host: env.SUPABASE_DB_HOST, port: 5432, user: 'postgres',
+    password: env.SUPABASE_DB_PASSWORD, database: 'postgres',
+    ssl: { rejectUnauthorized: false },
+  });
+  await client.connect();
+  const fx = ZEPBOUND_CONFLICT_FIXTURE;
+  let dbFailures = 0;
+  const check = (name, cond, detail = '') => {
+    console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? ' - ' + detail : ''}`);
+    if (!cond) dbFailures++;
+  };
+
+  const { rows: [row] } = await client.query(
+    `select e.id, e.verification_status, e.annual_max_savings from exploits e
+     join drugs d on d.id = e.drug_id where d.name = $1 and e.title = $2`,
+    [fx.drug, fx.pathway_title],
+  );
+  check('fixture row exists', Boolean(row));
+  if (row) {
+    check(`verification_status = 'conflicted'`, row.verification_status === fx.expected.verification_status, row.verification_status);
+    check('trusted annual_max_savings is NULL (refuses to guess)', row.annual_max_savings === null, String(row.annual_max_savings));
+    const { rows: conflicts } = await client.query(
+      `select value_a, value_b from evidence_conflicts where exploit_id = $1 and field_name = $2 and resolved_at is null`,
+      [row.id, fx.disputed_field],
+    );
+    const vals = conflicts.flatMap((r) => [r.value_a, r.value_b]);
+    check('open conflict captures BOTH disputed figures',
+      conflicts.length >= 1 && fx.disputed_values.every((v) => vals.includes(v)), JSON.stringify(conflicts));
+    const gate = await client.query(
+      `update exploits set verification_status = 'verified_current' where id = $1`, [row.id],
+    ).then(() => false).catch((e) => e.message.includes('open evidence_conflicts'));
+    check('db gate rejects verified_current while conflict is open', gate === true);
+  }
+  await client.end();
+  console.log(dbFailures === 0 ? '\nZEPBOUND CONFLICT FIXTURE: ALL PASS' : `\nZEPBOUND CONFLICT FIXTURE: ${dbFailures} FAILURE(S)`);
+  process.exit(dbFailures === 0 ? 0 : 1);
+}

@@ -52,16 +52,18 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/005_can_access_case_security_definer.sql` →
 `db/006_conversational_extraction.sql` →
 `db/007_language_and_consent_ledger.sql` → `db/008_document_intake.sql`
-→ `db/009_data_retention.sql` → `db/011_reduced_if_maximizer_detected.sql`
+→ `db/009_data_retention.sql` → `db/010_state_accumulator_ban_laws.sql`
+→ `db/011_reduced_if_maximizer_detected.sql`
 → `db/012_counter_override_guidance.sql` → `db/013_eliquis_dtp_tiers.sql`
-→ `db/014_case_outcomes_pharmacy.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–009 and
-011–014 are idempotent). Note: `010_state_accumulator_ban_laws.sql` exists
-at repo root, deliberately UNAPPLIED pending the state-law reconciliation
-(docs/build-plans/ — the state-law-reconciliation-plan doc). Apply order
-between 010 and 011–013 does not matter (011–013 touch only
-`exploits`/`price_points`/their own table; 010 is standalone), but 010
-must be reconciled before it loads.
+→ `db/014_case_outcomes_pharmacy.sql` → `db/015_income_pct_fpl.sql` →
+`db/016_eligibility_screeners.sql` → `db/017_exploits_evidence_fold.sql`
+→ `db/018_bundle_seeds.sql` → `db/019_nv_regulatory_guidance.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–019
+are idempotent). 010 loads owner-verified demo states (IA/ND/CA
+primary_source_verified; NV classified `regulatory_guidance` by the owner
+2026-08-12 via db/019 — not folded into yes/no); the other 48 rows stay
+`secondary_aggregated` with
+corroboration data loaded by `scripts/load_state_corroboration.mjs`.
 
 ## Authority and read order
 
@@ -112,7 +114,7 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 
 ## Key files and their status
 
-- `schema.sql` — 32 tables, single source of truth for the DB. Apply
+- `schema.sql` — 36 tables, single source of truth for the DB. Apply
   first on a fresh project.
 - `db/002_identity_crypto.sql` — pgcrypto extension + `encrypt_identity`/
   `decrypt_identity` helpers (service-role only). Widens
@@ -120,8 +122,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 - `db/003_rls_policies.sql` — RLS on all 27 tables + `can_access_case()`
   helper. Reference data = authenticated read; user data = owner/caregiver.
 - `app/api/chat/route.ts` — the chat route. Requires a session (Bearer
-  JWT or cookie via `lib/session.ts`; 401 otherwise). 3-step pipeline:
-  extraction → retrieval → grounded response; empty retrieval and
+  JWT or cookie via `lib/session.ts`; 401 otherwise). Pipeline: extraction
+  → retrieval → AKS hard-block → `lib/ranking.ts` (deterministic pathway
+  order) → grounded response; empty retrieval and
   unparseable extraction both short-circuit to deterministic answers in
   code. `callModel()` (OpenRouter direct, `lib/callModel.ts`) logs one
   usage line per call.
@@ -151,6 +154,13 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     `scripts/test_medicare.ts`). Manufacturer copay cards never surface for
     Medicare/Medicaid patients; the block reason is appended
     deterministically in code, never left to the model.
+  - `ranking.ts` — the ranking engine (built 2026-08-12). Pure
+    `rankPathways()` (tested by `scripts/test_ranking.ts`) + DB loader
+    `rankSavingsPathsForDrug()`. Winner = lowest 3-12 month trajectory
+    cost, never point-in-time; only `verified_current` rows rank;
+    conflicted/unresolved rows go to pendingVerification with no number;
+    state-ban assertions require `primary_source_verified` (the SQL
+    function has no confidence awareness).
   - `extractedFacts.ts` — Feature A merge step (built 2026-07-28): every
     extracted fact → durable profile/case/med row immediately;
     contradictions park in `pending_fact_corrections` (never silent
@@ -200,7 +210,15 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   `test_medicare.ts` (pure AKS hard-block tests),
   `smoke_medicare.mjs` (e2e: Medicare Part D + Eliquis → copay card
   blocked, PAP surfaced, legal note visible),
-  `test_outcomes.ts` (pure outcome-prompt decision tests). Node scripts read
+  `test_outcomes.ts` (pure outcome-prompt decision tests),
+  `test_ranking.ts` (pure ranking-engine tests),
+  `eval_ranking_cases.mjs` + `eval_ranking.ts` (12 ranking eval cases;
+  owner supplies ground truth, nothing self-grades),
+  `smoke_zepbound_conflict.mjs` (live chat: conflicted Zepbound card
+  surfaces only as pending-verification, never a trusted number),
+  `load_state_corroboration.mjs` (fills corroboration_count/source_pass_ids
+  on secondary state-ban rows from the reconciliation JSON; never touches
+  verified/flagged rows). Node scripts read
   `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),

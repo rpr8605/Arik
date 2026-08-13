@@ -85,6 +85,7 @@ FROM (VALUES
   ('GA','Georgia','state','yes','no_generic_only','fully_insured','unknown','secondary_aggregated','Needs primary statute URL'),
   ('IN','Indiana','state','yes','no_generic_only','fully_insured','unknown','secondary_aggregated','Needs primary statute URL'),
   ('KY','Kentucky','state','yes','no_generic_only','fully_insured','unknown','secondary_aggregated','Needs primary statute URL'),
+  ('KS','Kansas','state','no','none',NULL,'unknown','secondary_aggregated','Not listed in any ban source found — treat as no ban until confirmed (row added 2026-08-12; was missing from the original seed, found by post-load count check)'),
   ('ME','Maine','state','yes','no_generic_only','fully_insured','unknown','secondary_aggregated','Needs primary statute URL'),
   ('MD','Maryland','state','yes','no_generic_only','fully_insured','unknown','secondary_aggregated','Needs primary statute URL'),
   ('NC','North Carolina','state','yes','no_generic_only','fully_insured','unknown','secondary_aggregated','Needs primary statute URL'),
@@ -119,6 +120,60 @@ FROM (VALUES
   ('WY','Wyoming','state','no','none',NULL,'unknown','secondary_aggregated','Not listed in any ban source found — treat as no ban until confirmed')
 ) AS v(state_code, jurisdiction_name, jurisdiction_type, ban_enacted, ban_type, applies_to_market, covers_maximizers, verification_status, notes)
 ON CONFLICT (state_code) DO NOTHING;
+
+-- 4b. Owner-verified demo states (2026-08-12, ranking-engine ticket Step 1).
+-- These four rows override the secondary seed with primary-source-verified
+-- data (IA/ND/CA) and the flagged-unresolved classification (NV).
+
+-- Primary sources for the verified rows (URL-guarded):
+INSERT INTO sources (source_type, title, url, evidence_grade, last_verified_at)
+SELECT 'state_statute', 'Iowa SF 383 (2025 Iowa Acts ch. 151) — enrolled session law, signed 2025-06-11',
+  'https://www.legis.iowa.gov/docs/publications/iactc/91.1/CH0151.pdf', 'A', '2026-08-12'
+WHERE NOT EXISTS (SELECT 1 FROM sources WHERE url = 'https://www.legis.iowa.gov/docs/publications/iactc/91.1/CH0151.pdf');
+INSERT INTO sources (source_type, title, url, evidence_grade, last_verified_at)
+SELECT 'state_statute', 'North Dakota HB 1216 (69th Assembly 2025) — bill actions, signed by Governor 2025-04-29',
+  'https://ndlegis.gov/assembly/69-2025/regular/bill-actions/ba1216.html', 'A', '2026-08-12'
+WHERE NOT EXISTS (SELECT 1 FROM sources WHERE url = 'https://ndlegis.gov/assembly/69-2025/regular/bill-actions/ba1216.html');
+INSERT INTO sources (source_type, title, url, evidence_grade, last_verified_at)
+SELECT 'state_statute', 'California AB 2180 (2023-24) — official leginfo history: held in committee 05/16/24, from committee without further action 11/30/24 (died)',
+  'https://leginfo.legislature.ca.gov/faces/billStatusClient.xhtml?bill_id=202320240AB2180', 'A', '2026-08-12'
+WHERE NOT EXISTS (SELECT 1 FROM sources WHERE url = 'https://leginfo.legislature.ca.gov/faces/billStatusClient.xhtml?bill_id=202320240AB2180');
+
+-- Iowa: enacted, protected WITH a carve-out (the Wellmark injunction).
+UPDATE state_accumulator_ban_laws SET
+  ban_enacted = 'yes', ban_type = 'outright', applies_to_market = 'fully_insured',
+  verification_status = 'primary_source_verified',
+  source_id = (SELECT id FROM sources WHERE url = 'https://www.legis.iowa.gov/docs/publications/iactc/91.1/CH0151.pdf' LIMIT 1),
+  notes = 'SF 383 (2025 Iowa Acts ch. 151 / Iowa Code § 510B.8(5)-(7)), effective 2025-07-01. CARVE-OUT: Wellmark federal injunction (Oct 29, 2025) limits enforcement against self-funded ERISA plans — protection applies to state-regulated fully-insured plans only.',
+  last_reviewed_at = now(), updated_at = now()
+WHERE state_code = 'IA';
+
+-- North Dakota: enacted (generic carve-out per both citing passes).
+UPDATE state_accumulator_ban_laws SET
+  ban_enacted = 'yes', ban_type = 'no_generic_only', applies_to_market = 'fully_insured',
+  verification_status = 'primary_source_verified',
+  source_id = (SELECT id FROM sources WHERE url = 'https://ndlegis.gov/assembly/69-2025/regular/bill-actions/ba1216.html' LIMIT 1),
+  notes = 'HB 1216 (new section to ch. 26.1-36 + § 26.1-36.6-03 amendment applying it to self-insurance plans under commissioner jurisdiction — ERISA tension noted for legal review), effective 2025-07-31. Generic carve-out per citing passes (no_generic_only).',
+  last_reviewed_at = now(), updated_at = now()
+WHERE state_code = 'ND';
+
+-- California: confirmed NO current law.
+UPDATE state_accumulator_ban_laws SET
+  ban_enacted = 'no', ban_type = 'none', applies_to_market = NULL,
+  verification_status = 'primary_source_verified',
+  source_id = (SELECT id FROM sources WHERE url = 'https://leginfo.legislature.ca.gov/faces/billStatusClient.xhtml?bill_id=202320240AB2180' LIMIT 1),
+  notes = 'AB 2180 died in committee 11/30/24 (leginfo history) — no current accumulator ban. SB 1199 (2025-26 session) is a pending successor: watch item, not a current protection.',
+  last_reviewed_at = now(), updated_at = now()
+WHERE state_code = 'CA';
+
+-- Nevada: deliberately UNRESOLVED — classification decision (regulatory
+-- bulletin vs enacted statute), not a citation gap. Flagged back to owner.
+UPDATE state_accumulator_ban_laws SET
+  ban_enacted = 'partial', ban_type = 'unknown', applies_to_market = NULL,
+  verification_status = 'unknown',
+  notes = 'UNRESOLVED CLASSIFICATION QUESTION (flagged to owner 2026-08-12): NV Division of Insurance enforces copay-assistance counting via 2020-NBPP plan-year guidance (marketplace plans), not an enacted statute. Needs a decision on whether regulatory enforcement counts as a ban for ranking purposes.',
+  last_reviewed_at = now(), updated_at = now()
+WHERE state_code = 'NV';
 
 -- 5. Helper: raw ban_type lookup
 CREATE OR REPLACE FUNCTION get_state_ban_type(p_state_code TEXT)
