@@ -126,8 +126,13 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   → retrieval → AKS hard-block → `lib/ranking.ts` (deterministic pathway
   order) → grounded response; empty retrieval and
   unparseable extraction both short-circuit to deterministic answers in
-  code. `callModel()` (OpenRouter direct, `lib/callModel.ts`) logs one
-  usage line per call.
+  code. Third short-circuit (2026-08-13): the extraction schema carries
+  `on_topic`; clearly off-topic messages (general knowledge, creative
+  writing, coding help, prompt-extraction attempts) get the warm redirect
+  string at the EXTRACTION step — no fact merge, no retrieval, no
+  response-model call. Crisis/distress language is always on_topic so it
+  reaches the crisis-aware pipeline. `callModel()` (OpenRouter direct,
+  `lib/callModel.ts`) logs one usage line per call.
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure
@@ -181,12 +186,22 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   - `session.ts` — `getUserId(req)`: Bearer JWT or cookie session →
     userId, else null (→ 401). Used by `/api/chat` and `/api/cases/start`.
 - `app/` — `login` (magic link + password), `auth/callback`, `page.tsx`
-  (case list + "what's going on?" front door + `PlanTypeSelector`
+  (case list + guided-entry front door + `PlanTypeSelector`
   coverage control), `cases/[id]` (+ Thread, DocumentUpload,
   OutcomePrompt client comps), `api/cases/start` (creates case + session
   from free text; keyword-type heuristic is a visible filing aid).
-  `layout.tsx` carries the temp-demo banner. `proxy.ts`
-  refreshes the auth cookie (Next 16's name for middleware).
+  `NewCaseForm.tsx` is the guided entry (2026-08-13): honest scope line,
+  three suggested-drug chips (Eliquis/Dupixent/Zepbound), a divider,
+  then the de-emphasized open textarea. The Eliquis chip sets plan type
+  to Medicare via `/api/profile/insurance-type` ONLY when the profile
+  has none (never overwrites a chosen value) so the AKS hard-block
+  actually fires in the demo. `layout.tsx` carries the temp-demo banner,
+  the brand fonts (Outfit headings / Source Sans 3 body via next/font),
+  and the fixed glow blobs; `globals.css` holds the brand treatment
+  (emerald/slate, light-only by design — no dark scheme, 600px centered
+  panel at ≥640px, 56px primary / 48px pill touch targets). `proxy.ts`
+  refreshes the auth cookie (Next 16's name for middleware) and signs
+  cookieless visitors in anonymously.
 - `scripts/` — `validate_repo.py` (structural gate), `apply_db.mjs`
   (fresh-project schema apply + verify), `run_sql.mjs` (apply one file),
   `smoke_rls.mjs` (RLS cross-user tests, needs fixture users in
@@ -216,6 +231,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   owner supplies ground truth, nothing self-grades),
   `smoke_zepbound_conflict.mjs` (live chat: conflicted Zepbound card
   surfaces only as pending-verification, never a trusted number),
+  `smoke_scope_boundary.mjs` (2026-08-13: out-of-scope drug gets the
+  honest no-data answer; 4 off-topic message types get the redirect
+  verbatim; broad on-topic questions still reach the response model),
   `load_state_corroboration.mjs` (fills corroboration_count/source_pass_ids
   on secondary state-ban rows from the reconciliation JSON; never touches
   verified/flagged rows). Node scripts read
@@ -281,6 +299,25 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   local CLI account lacks the Arik project. `/api/jobs/purge-expired-
   uploads` runs the identical purge today; deploy + pg_net schedule is
   the one open infra action.
+- Vercel: production alias is https://arik-liard.vercel.app (project
+  `arik`, team `rpr-dev-s-projects`, single-seat Hobby; repo `.vercel/`
+  is linked). Deployment URLs (arik-*-rpr-dev-s-projects.vercel.app) are
+  behind Vercel SSO deployment protection — anonymous requests 302 to
+  vercel.com/sso-api, so probe the alias for live checks, not the
+  deployment URL. CLI access = `vercel login` (creds cached under
+  %APPDATA%\com.vercel.cli\Data); no token in any .env file.
+  `vercel logs` streams live only by default; for history use
+  `--no-follow` with `--since`/`--status-code`/`--expand`.
+- 2026-08-13 incident: prod 500 on GET / was Vercel-only because the
+  four server env vars (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+  IDENTITY_ENCRYPTION_KEY, OPENROUTER_API_KEY) existed with EMPTY values
+  — `vercel env ls` lists names only; verify values with
+  `vercel env pull` (compare lengths, never print secrets). Env changes
+  need a redeploy; `vercel redeploy <url>` rebuilds the same source,
+  avoiding working-tree drift. Also note proxy.ts signs cookieless
+  visitors in anonymously (signInAnonymously), so anonymous traffic DOES
+  reach supabaseAdmin() code paths — never rule out a server-side path
+  on "anon never gets there" grounds.
 
 ## Architecture intent (affects how you extend it)
 

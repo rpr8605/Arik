@@ -37,10 +37,12 @@ export default async function Home() {
   return (
     <main>
       <LanguagePreference />
+      <section aria-label="Start a new case">
+        <h1>What&apos;s going on?</h1>
+        <NewCaseForm currentPlanType={profile?.insurance_type ?? null} />
+      </section>
       <PlanTypeSelector current={profile?.insurance_type ?? null} />
       <ExplanationPreference current={profile?.explanation_style ?? null} />
-      <h1>What&apos;s going on?</h1>
-      <NewCaseForm />
 
       <h2>Your cases</h2>
       {cases.length === 0 ? (

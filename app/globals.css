@@ -1,50 +1,109 @@
 /* Arik global stylesheet — created 2026-08-12 after the "zero styling"
    diagnosis: the app previously had NO CSS at all (inline style={{}}
    attributes only). This is the base layer: typography, layout, form
-   elements. Component-level inline styles continue to work on top. */
+   elements. Component-level inline styles continue to work on top.
+
+   Brand treatment (2026-08-13 ticket): light gradient + fixed glow
+   blobs, solid white cards, elderly-first sizing, and a tablet-width
+   centered panel on desktop. Emerald/Slate palette; Outfit for
+   headings, Source Sans 3 for body (loaded via next/font in
+   layout.tsx). LIGHT ONLY by design — no dark-scheme variant. */
 
 :root {
-  --arik-ink: #1a2233;
-  --arik-muted: #5a6478;
-  --arik-brand: #2b5fd9;
-  --arik-brand-dark: #1e46a8;
-  --arik-bg: #f7f8fa;
+  --arik-ink: #1f3d5a; /* slate */
+  --arik-muted: #51637a;
+  --arik-brand: #0fa68e; /* emerald */
+  --arik-brand-dark: #0b8a76;
+  --arik-brand-tint: rgba(15, 166, 142, 0.12);
+  --arik-sky: #7ec6f4;
   --arik-card: #ffffff;
-  --arik-border: #d8dde6;
+  --arik-border: rgba(31, 61, 90, 0.1);
+  --arik-border-strong: rgba(31, 61, 90, 0.35);
+  --arik-shadow: 0 8px 24px rgba(31, 61, 90, 0.06);
   --arik-alert-bg: #fff3cd;
+  --arik-radius-card: 18px;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
-  background: var(--arik-bg);
+  min-height: 100vh;
+  background: linear-gradient(160deg, #eaf6fb 0%, #fafbfc 45%, #eaf9f4 100%) fixed;
   color: var(--arik-ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  font-family: var(--font-source-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.55;
 }
 
+/* Fixed glow blobs — position:fixed so they stay put during scroll.
+   The gradient above and these blobs fill the full viewport at every
+   width; only the content panel narrows. */
+.glow {
+  position: fixed;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 0;
+}
+.glow-sky {
+  width: 520px;
+  height: 520px;
+  top: -140px;
+  right: -140px;
+  background: radial-gradient(circle, rgba(126, 198, 244, 0.55), rgba(126, 198, 244, 0));
+}
+.glow-emerald {
+  width: 420px;
+  height: 420px;
+  bottom: -110px;
+  left: -110px;
+  background: radial-gradient(circle, rgba(15, 166, 142, 0.45), rgba(15, 166, 142, 0));
+}
+
+/* Content sits above the blobs. */
+.app-shell {
+  position: relative;
+  z-index: 1;
+}
+
+/* Mobile-first: full-width, edge-to-edge padding below 640px.
+   640px and up: the app panel constrains to 600px and centers — a
+   tablet-width app view on desktop, never a site that keeps stretching. */
 main {
-  max-width: 46rem;
+  width: 100%;
   margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
+  padding: 1.25rem 1.25rem 4rem;
+}
+@media (min-width: 640px) {
+  main {
+    max-width: 600px;
+    padding: 3rem 1.5rem 5rem;
+  }
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-outfit), var(--font-source-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.2;
+}
 h1 {
-  font-size: 1.6rem;
-  margin: 1rem 0 0.75rem;
+  font-size: 30px;
+  margin: 0 0 1rem;
 }
-
 h2 {
-  font-size: 1.2rem;
-  margin: 1.5rem 0 0.5rem;
+  font-size: 22px;
+  margin: 2rem 0 0.75rem;
 }
 
 a {
-  color: var(--arik-brand);
+  color: var(--arik-brand-dark);
   text-decoration: none;
 }
 
@@ -52,15 +111,18 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Primary buttons: 56px minimum, 18px text — unambiguous targets. */
 button,
 input[type="submit"] {
   background: var(--arik-brand);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 0.55rem 1.1rem;
-  font-size: 1rem;
+  border-radius: 14px;
+  min-height: 56px;
+  padding: 0.75rem 1.5rem;
+  font-size: 18px;
   font-weight: 600;
+  font-family: var(--font-outfit), var(--font-source-sans), sans-serif;
   cursor: pointer;
 }
 
@@ -73,15 +135,28 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Secondary/plain buttons that sit next to a primary action */
+/* Secondary actions are pills: 48px minimum, 17px text. */
 button[type="button"] {
   background: #fff;
-  color: var(--arik-brand);
-  border: 1px solid var(--arik-border);
+  color: var(--arik-brand-dark);
+  border: 1px solid var(--arik-border-strong);
+  border-radius: 999px;
+  min-height: 48px;
+  padding: 0.5rem 1.25rem;
+  font-size: 17px;
 }
 
 button[type="button"]:hover:not(:disabled) {
-  background: #eef2fb;
+  background: var(--arik-brand-tint);
+}
+
+/* Selected pill (e.g. the active language) reads as selected, not dimmed. */
+button[type="button"][aria-pressed="true"]:disabled {
+  opacity: 1;
+  cursor: default;
+  background: var(--arik-brand-tint);
+  border-color: var(--arik-brand);
+  color: var(--arik-ink);
 }
 
 input[type="text"],
@@ -93,26 +168,142 @@ textarea {
   width: 100%;
   max-width: 40rem;
   margin: 0.25rem 0 0.75rem;
-  padding: 0.55rem 0.7rem;
-  font-size: 1rem;
-  border: 1px solid var(--arik-border);
-  border-radius: 6px;
+  padding: 0.75rem 0.9rem;
+  font-size: 18px;
+  font-family: inherit;
+  border: 1px solid var(--arik-border-strong);
+  border-radius: 12px;
   background: #fff;
   color: var(--arik-ink);
 }
 
-input[type="radio"],
 input[type="checkbox"] {
-  margin-right: 0.25rem;
+  width: 22px;
+  height: 22px;
+  margin-right: 0.4rem;
+  accent-color: var(--arik-brand);
+}
+
+/* Custom radio dots: 22px with a 2.5px ring, emerald fill when on. */
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin: 0 0.4rem 0 0;
+  border: 2.5px solid var(--arik-border-strong);
+  border-radius: 50%;
+  background: #fff;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: -4px;
+  cursor: pointer;
+}
+input[type="radio"]::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: scale(0);
+  background: var(--arik-brand);
+}
+input[type="radio"]:checked {
+  border-color: var(--arik-brand);
+}
+input[type="radio"]:checked::before {
+  transform: scale(1);
+}
+input[type="radio"]:disabled {
+  cursor: not-allowed;
 }
 
 label {
+  font-size: 17px;
   font-weight: 500;
 }
 
-section[aria-label] {
+/* Radio rows wrap naturally at narrow widths — no forced grid. */
+section[aria-label] label {
+  display: inline-block;
+  margin: 0.25rem 0.75rem 0.25rem 0;
+  font-weight: 400;
+}
+
+/* Solid white cards — not translucent. */
+section[aria-label],
+.card {
   background: var(--arik-card);
-  border-radius: 8px;
+  border: 1px solid var(--arik-border);
+  box-shadow: var(--arik-shadow);
+  border-radius: var(--arik-radius-card);
+  padding: 1.5rem;
+}
+
+/* Guided entry (Part 2, 2026-08-13): suggested-prompt chips are tappable
+   cards, stacked full-width; the open textarea sits de-emphasized under
+   a divider as the secondary path. */
+.scope-line {
+  font-size: 17px;
+  color: var(--arik-muted);
+  margin: 0 0 1rem;
+}
+
+.chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+button.chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  min-height: 56px;
+  padding: 0.9rem 1.25rem;
+  text-align: left;
+  background: #fff;
+  color: var(--arik-ink);
+  border: 1px solid var(--arik-border);
+  border-radius: 14px;
+  box-shadow: var(--arik-shadow);
+  font-size: 17px;
+  font-weight: 400;
+}
+button.chip strong {
+  font-family: var(--font-outfit), var(--font-source-sans), sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+}
+button.chip span {
+  color: var(--arik-muted);
+  font-size: 16px;
+}
+button.chip:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--arik-brand);
+}
+
+.entry-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0 1rem;
+  color: var(--arik-muted);
+  font-size: 16px;
+}
+.entry-divider::before,
+.entry-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--arik-border-strong);
+}
+
+/* The secondary path is visually quieter than the chips. */
+.own-entry textarea {
+  background: rgba(255, 255, 255, 0.65);
+  font-size: 17px;
 }
 
 /* Chat thread legibility */
@@ -149,37 +340,14 @@ section[aria-label] {
 
 @media (prefers-contrast: more) {
   :root {
-    --arik-ink: #000000;
-    --arik-muted: #2a2a2a;
-    --arik-brand: #003db3;
-    --arik-brand-dark: #002a7a;
-    --arik-border: #4a4a4a;
+    --arik-ink: #0a1e33;
+    --arik-muted: #1f3d5a;
+    --arik-brand: #0b8a76;
+    --arik-brand-dark: #086457;
+    --arik-border: rgba(31, 61, 90, 0.55);
+    --arik-border-strong: rgba(31, 61, 90, 0.75);
   }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --arik-ink: #e8eaf0;
-    --arik-muted: #a8b0c2;
-    --arik-brand: #7ba0f0;
-    --arik-brand-dark: #a3bdf5;
-    --arik-bg: #12151c;
-    --arik-card: #1c212c;
-    --arik-border: #3a4252;
-    --arik-alert-bg: #4a3f1a;
-  }
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="number"],
-  textarea {
-    background: #1c212c;
-    color: var(--arik-ink);
-  }
-  button[type="button"] {
-    background: #1c212c;
-  }
-  button[type="button"]:hover:not(:disabled) {
-    background: #262d3c;
+  .own-entry textarea {
+    background: #fff;
   }
 }
