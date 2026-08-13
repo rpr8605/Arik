@@ -113,6 +113,8 @@ console.log(`smoke target: ${BASE} | OpenRouter usage before: $${usageBefore}\n`
 const grounded = await chat('How do I pay less for Eliquis?');
 check('grounded query returns 200 with sources', grounded.status === 200 && (grounded.json?.sources ?? []).length >= 1, `${(grounded.json?.sources ?? []).length} exploit source(s)`);
 check('grounded response is non-empty text', typeof grounded.json?.response === 'string' && grounded.json.response.length > 40);
+check('boundary line present even in standard mode (code-guaranteed)', /what i can.t guarantee/i.test(grounded.json?.response ?? ''));
+check('ranked_pathways present in response JSON', grounded.json?.ranked_pathways != null);
 console.log('--- grounded response (first 600 chars) ---');
 console.log((grounded.json?.response ?? '').slice(0, 600));
 console.log('--- grounded response (last 900 chars - trust receipt lives here) ---');

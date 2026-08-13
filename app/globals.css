@@ -132,3 +132,54 @@ section[aria-label] {
   white-space: nowrap;
   border: 0;
 }
+
+/* Accessibility defaults from real, stated device preferences only
+   (2026-08-12 ticket) — never inferred data. The explicit explanation-
+   style toggle in the UI always overrides these defaults. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --arik-ink: #000000;
+    --arik-muted: #2a2a2a;
+    --arik-brand: #003db3;
+    --arik-brand-dark: #002a7a;
+    --arik-border: #4a4a4a;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --arik-ink: #e8eaf0;
+    --arik-muted: #a8b0c2;
+    --arik-brand: #7ba0f0;
+    --arik-brand-dark: #a3bdf5;
+    --arik-bg: #12151c;
+    --arik-card: #1c212c;
+    --arik-border: #3a4252;
+    --arik-alert-bg: #4a3f1a;
+  }
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  textarea {
+    background: #1c212c;
+    color: var(--arik-ink);
+  }
+  button[type="button"] {
+    background: #1c212c;
+  }
+  button[type="button"]:hover:not(:disabled) {
+    background: #262d3c;
+  }
+}

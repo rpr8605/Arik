@@ -122,6 +122,10 @@ check('query returns 200', res.status === 200, `status ${res.status}`);
 check('legal explanation is visible (deterministic block note)', /Why you're not seeing a manufacturer copay card here/.test(response));
 check('the law is named (Anti-Kickback Statute)', /Anti-Kickback Statute/.test(response));
 check('blocked card is named as blocked, not offered', /Blocked for your coverage: Eliquis Co-pay Card/.test(response));
+// Guided-advocate card format (Eliquis+Medicare triggers it): boundary
+// line and details marker are both required, same facts intact.
+check('boundary line present (What I can\'t guarantee…)', /what i can.t guarantee/i.test(response));
+check('card format used: ---DETAILS--- marker present', response.includes('---DETAILS---'));
 
 const { rows: msgs } = await pgClient.query(
   `select role, retrieved_exploit_ids from chat_messages where session_id = $1 and role = 'assistant' order by created_at desc limit 1`,

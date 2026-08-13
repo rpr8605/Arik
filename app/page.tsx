@@ -7,6 +7,7 @@ import { listCases } from '@/lib/cases';
 import { NewCaseForm } from './NewCaseForm';
 import { LanguagePreference } from './LanguagePreference';
 import { PlanTypeSelector } from './PlanTypeSelector';
+import { ExplanationPreference } from './ExplanationPreference';
 
 // Home = case list, not a profile wall (UI_UX.md, CRISIS_AWARE_DESIGN.md).
 export default async function Home() {
@@ -29,7 +30,7 @@ export default async function Home() {
   const cases = await listCases(user.id);
   const { data: profile } = await supabaseAdmin()
     .from('user_matching_profile')
-    .select('insurance_type')
+    .select('insurance_type, explanation_style')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -37,6 +38,7 @@ export default async function Home() {
     <main>
       <LanguagePreference />
       <PlanTypeSelector current={profile?.insurance_type ?? null} />
+      <ExplanationPreference current={profile?.explanation_style ?? null} />
       <h1>What&apos;s going on?</h1>
       <NewCaseForm />
 

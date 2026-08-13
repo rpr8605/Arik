@@ -4,6 +4,16 @@ import { NextResponse, type NextRequest } from 'next/server';
 // Standard Supabase session-refresh proxy (formerly "middleware"): keeps
 // the auth cookie fresh so server components and route handlers always
 // see a valid session.
+//
+// Anonymous-first (2026-08-12, demo requirement): a first-time visitor
+// with no session gets an anonymous Supabase session created HERE, before
+// any page renders — no login wall. Anonymous sessions are real user ids,
+// so every RLS policy keyed to auth.uid() works unchanged. Skipped for
+// /api (bots shouldn't mint users), /login and /auth (the real-account
+// path stays clean). If anonymous sign-ins are disabled on the project,
+// the attempt 422s and we fall through to the pre-existing login redirect.
+const NO_AUTO_ANON = [/^\/api(\/|$)/, /^\/login/, /^\/auth(\/|$)/];
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -24,7 +34,19 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user && !NO_AUTO_ANON.some((re) => re.test(request.nextUrl.pathname))) {
+    try {
+      // setAll above persists the new session cookie onto the response.
+      await supabase.auth.signInAnonymously();
+    } catch {
+      // Provider disabled or network hiccup — fall through; the page's own
+      // auth check redirects to /login exactly as before this change.
+    }
+  }
   return response;
 }
 

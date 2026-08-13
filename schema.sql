@@ -48,6 +48,8 @@ create table user_matching_profile (
   preferred_language text default 'en', -- per UNIVERSAL_ACCESS.md: full-conversation language, generated directly not translated. Launch scope: 'en'/'es' only (non-English extraction quality unvalidated - launch decision, not technical)
   income_bracket text,               -- optional, only if patient wants PAP/charity-care matching
   income_pct_fpl numeric,            -- db/015: numeric %FPL; screener/ranking logic reads THIS, never the bracket text
+  explanation_style text not null default 'standard'
+    check (explanation_style in ('standard','simple')),  -- db/021: explicit opt-in toggle; 'simple' is never inferred
   household_size int,                -- optional, same opt-in pattern as income
   preferred_pharmacy text,
   employer_name text,                -- optional, for EMPLOYER_PLAN_DATABASE.md matching
@@ -257,6 +259,7 @@ create table exploits (
   -- db/011: do this program's terms reduce the card maximum when maximizer-
   -- program enrollment is detected? null = not yet checked (NOT "no clause").
   reduced_if_maximizer_detected boolean,
+  support_phone text,                 -- db/021: program phone, only from a cited program page; null = no Call button
   -- db/016: referral_only rows (340B-type entries, some population pathways)
   -- may NEVER carry a dollar figure; the CHECK makes that a DB rule.
   referral_only boolean not null default false,

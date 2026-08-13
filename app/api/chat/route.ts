@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { callModel } from '@/lib/callModel';
 import { getUserId } from '@/lib/session';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
-import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON } from '@/lib/medicareEligibility';
+import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
 
 // Created lazily per call - a module-level client crashes Next's
@@ -191,7 +191,7 @@ async function retrieveContext(userId: string, intent: Intent, profile: any) {
 }
 
 // --- Step 3: grounded response, only speaks from retrieved context ---
-async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es') {
+async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard') {
   const systemPrompt = await loadSystemPrompt();
 
   const groundedInput = `
@@ -216,6 +216,10 @@ RETRIEVED_CONTEXT: ${JSON.stringify({
   })}
 CONVERSATION_HISTORY: ${JSON.stringify(history)}
 USER_MESSAGE: ${userMessage}
+RESPONSE_FORMAT: ${format} ('card' = guided advocate format per the system
+prompt: one-line answer, numbered action steps, boundary line, then the
+---DETAILS--- marker. 'standard' = existing structure with the same
+boundary line and marker.)
 RESPONSE_LANGUAGE: ${LANGUAGE_NAMES[lang]} (${lang}). Write the entire
 response in this language. Exception - citations: quote every source
 verbatim in its original language, never translated. Translating a
@@ -341,7 +345,29 @@ export async function POST(req: Request) {
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true });
 
-  const response = (await generateResponse(message, modelContext, history ?? [], lang)) + blockedNote;
+  // Guided-advocate ticket (2026-08-12): the card format is the default
+  // when the patient opted into 'simple', and always for the Eliquis
+  // Medicare proof case. Everything else stays 'standard'.
+  const isEliquisMedicare =
+    /eliquis|apixaban/i.test(intent.drug_name ?? '') &&
+    isGovernmentInsurance(profile?.insurance_type);
+  const useCardFormat = profile?.explanation_style === 'simple' || isEliquisMedicare;
+
+  let response =
+    (await generateResponse(message, modelContext, history ?? [], lang, useCardFormat ? 'card' : 'standard')) +
+    blockedNote;
+  // The boundary line is REQUIRED in both modes — guarantee it in code
+  // rather than trusting the model never to drop it.
+  if (!/what i can.t guarantee|lo que no puedo garantizar/i.test(response)) {
+    response +=
+      lang === 'es'
+        ? '\n\nLo que no puedo garantizar: las decisiones de inscripción del programa, la aceptación de la farmacia, ni el precio final exacto en el mostrador.'
+        : "\n\nWhat I can't guarantee: program enrollment decisions, pharmacy acceptance, and the exact final price at the counter.";
+  }
+
+  // "Call the program" renders only when a cited row carries a real number.
+  const programPhone =
+    (viable ?? []).find((e: any) => e.support_phone)?.support_phone ?? null;
 
   const retrievedIds = viable.map((e: any) => e.id);
   await supabase().from('chat_messages').insert([
@@ -349,7 +375,7 @@ export async function POST(req: Request) {
     { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: retrievedIds },
   ]);
 
-  return Response.json({ response, sources: context.exploits, corrections, ranked_pathways: ranking });
+  return Response.json({ response, sources: context.exploits, corrections, ranked_pathways: ranking, program_phone: programPhone });
 }
 
 let cachedPrompt: string | null = null;
