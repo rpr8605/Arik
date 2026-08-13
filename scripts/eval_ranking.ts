@@ -15,11 +15,12 @@ for (const line of readFileSync(new URL('../.env.local', import.meta.url), 'utf8
 }
 
 interface Expected {
-  winnerTitle?: string;
+  winnerTitle?: string | null;   // null = expect NO winner
   rankedIncludes?: string[];
   rankedExcludes?: string[];
   pendingIncludes?: string[];
   blockedIncludes?: string[];
+  notApplicableIncludes?: string[];
   stateNoteStatus?: string;
 }
 
@@ -43,7 +44,7 @@ for (const kase of RANKING_EVAL_CASES as any[]) {
 
   const result = await rankSavingsPathsForDrug({
     drugName,
-    patient: { insuranceType, stateCode },
+    patient: { insuranceType, stateCode, drugCovered: kase.input.drugCovered ?? null },
     exploits: exploits ?? [],
     pricePoints: prices ?? [],
   });
@@ -64,11 +65,18 @@ for (const kase of RANKING_EVAL_CASES as any[]) {
     continue;
   }
   const problems: string[] = [];
-  if (exp.winnerTitle !== undefined && result.winner?.title !== exp.winnerTitle) problems.push(`winner=${result.winner?.title} expected ${exp.winnerTitle}`);
+  if (exp.winnerTitle !== undefined) {
+    if (exp.winnerTitle === null) {
+      if (result.winner) problems.push(`expected NO winner, got ${result.winner.title}`);
+    } else if (result.winner?.title !== exp.winnerTitle) {
+      problems.push(`winner=${result.winner?.title} expected ${exp.winnerTitle}`);
+    }
+  }
   for (const t of exp.rankedIncludes ?? []) if (!result.ranked.some((p) => p.title.includes(t))) problems.push(`ranked missing "${t}"`);
   for (const t of exp.rankedExcludes ?? []) if (result.ranked.some((p) => p.title.includes(t))) problems.push(`ranked should NOT include "${t}"`);
   for (const t of exp.pendingIncludes ?? []) if (!result.pendingVerification.some((p) => p.title.includes(t))) problems.push(`pending missing "${t}"`);
   for (const t of exp.blockedIncludes ?? []) if (!result.blocked.some((p) => p.title.includes(t))) problems.push(`blocked missing "${t}"`);
+  for (const t of exp.notApplicableIncludes ?? []) if (!result.notApplicable.some((p) => p.title.includes(t))) problems.push(`notApplicable missing "${t}"`);
   if (exp.stateNoteStatus !== undefined && result.stateNote?.status !== exp.stateNoteStatus) problems.push(`stateNote=${result.stateNote?.status} expected ${exp.stateNoteStatus}`);
   if (problems.length === 0) { console.log('PASS'); passed++; } else { console.log(`FAIL: ${problems.join('; ')}`); failed++; }
 }

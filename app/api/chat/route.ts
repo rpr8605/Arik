@@ -82,6 +82,7 @@ interface Intent {
   insurance_plan_name: string | null;
   prescriber_name: string | null;
   state_or_location: string | null;
+  drug_covered: boolean | null;   // "my plan doesn't cover it" -> false; drives branch-card ranking
 }
 
 const QUESTION_TYPES = ['price_check', 'why_did_price_change', 'find_savings', 'bill_dispute', 'denial_appeal', 'other'] as const;
@@ -102,6 +103,7 @@ function normalizeIntent(raw: any): Intent | null {
     insurance_plan_name: str(raw.insurance_plan_name),
     prescriber_name: str(raw.prescriber_name),
     state_or_location: str(raw.state_or_location),
+    drug_covered: typeof raw.drug_covered === 'boolean' ? raw.drug_covered : null,
   };
 }
 
@@ -126,7 +128,8 @@ Schema:
   "institution_name": string | null,
   "insurance_plan_name": string | null,
   "prescriber_name": string | null,
-  "state_or_location": string | null
+  "state_or_location": string | null,
+  "drug_covered": boolean | null  // false if the patient says their plan does NOT cover the drug; true if they say it does; null if not mentioned
 }
 
 <msg>${userMessage}</msg>`;
@@ -306,6 +309,7 @@ export async function POST(req: Request) {
             stateCode: profile?.state ?? null,
             incomePctFpl: profile?.income_pct_fpl ?? null,
             householdSize: profile?.household_size ?? null,
+            drugCovered: intent.drug_covered ?? null,
           },
           exploits: context.exploits ?? [],
           pricePoints: context.prices ?? [],

@@ -200,3 +200,20 @@ Plan changes forced by the reconciliation ticket (these WIN over Addendum 1 wher
 - **Pre-demo items all closed**: AKS hard-block (lib/medicareEligibility.ts + smoke_medicare e2e ALL PASS), copy hedging rule, plan-type-only insurance entry (`/api/profile/insurance-type` + home selector; member-ID collection removed from the vault), temp-demo banner in layout.
 - **Standing rule now in AGENTS.md**: every wait bounded (tool-call timeouts, AbortController in scripts, Wait-Job pattern for e2e); the 30s-hang root cause was model latency (~30s/call), fixed with 75s bounds + route warm-up.
 - **Open decision for owner**: Vercel deploy verification blocked — CLI token invalid, no production URL recorded anywhere in the repo. main is pushed (85b020c + outcome-wiring commit); if git integration exists, the deploy auto-triggered, but it couldn't be observed from here.
+
+---
+
+# ADDENDUM 5 — 2026-08-12 (ranking engine COMPLETE)
+
+The ranking-engine ticket (lib/ranking.ts) is **complete**: built, wired
+into the chat route, and the 12-case eval set PASSED against the owner's
+own ground-truth grading (12/12; 23/23 unit tests). Two grading-driven
+changes landed in the process: `db/020_conflict_classes.sql` (tier-mismatch
+conflicts rank provisionally; same-official-source conflicts never rank —
+the Zepbound non-covered fixture's invariant), and fit-before-evidence
+bucket ordering. The Eliquis card row's missing price floor ($10/fill)
+was repaired in db/018 from its own seeded terms. Case 7 real figures:
+MyWay card as low as $0/fill, $13,000/yr max. Case 12 finding: no
+Zepbound PAP exists — the honest empty result with both cards AKS-blocked.
+`drug_covered` added to chat extraction (ephemeral, never persisted) to
+route branch cards. Live chat smoke for the Zepbound conflict: ALL PASS.

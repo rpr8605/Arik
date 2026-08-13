@@ -97,8 +97,12 @@ and not exists (select 1 from exploits where title like 'Eliquis Direct-to-Patie
 
 -- 4. Eliquis copay card: official $2,000 annual max is provisionally
 -- trusted; the $6,400 third-party figure logs as a conflict (step 5).
+-- patient_price_floor is the card's own documented "$10 per fill"
+-- (as_low_as semantics per the price-page terms).
 update exploits set
   annual_max_savings = 2000,
+  patient_price_type = 'as_low_as',
+  patient_price_floor = 10,
   medicare_exclusion_reason = 'manufacturer_terms',
   terms_citation_source_id = (select id from sources where url = 'https://www.eliquis.bmscustomerconnect.com/price' limit 1)
 where title like 'Eliquis Co-pay Card%';

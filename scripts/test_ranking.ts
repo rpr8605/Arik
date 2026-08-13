@@ -79,5 +79,25 @@ check('notApplicable row is NOT ranked', !r.ranked.some((p) => p.title === 'Card
 r = rankPathways({ exploits: [conflictedCard], pricePoints: [], stateRow: IA, banApplies: true, patient: commercial });
 check('conflicted row stays pendingVerification, never notApplicable', r.pendingVerification.some((p) => p.title === 'Conflicted Card') && r.notApplicable.length === 0);
 
+// 9. Conflict classes (owner grading rule): tier-mismatch conflicts rank
+// with the official figure provisionally trusted; same-source conflicts
+// never rank; conflicted-with-no-conflict-rows is strict-pending.
+const tmCard = card({ id: 'c1', title: 'TierMismatch Card', verification_status: 'conflicted', annual_max_savings: 2000 });
+r = rankPathways({ exploits: [tmCard], pricePoints: [], stateRow: IA, banApplies: true, patient: commercial,
+  conflictsByExploitId: { c1: [{ conflict_class: 'tier_mismatch', value_a: '2000', value_b: '6400', resolved_at: null }] } });
+check('tier-mismatch conflicted card RANKS with provisional note', r.ranked.some((p) => p.title === 'TierMismatch Card' && p.trajectoryNotes.some((n) => /provisionally trusted/.test(n))));
+const ssCard = card({ id: 'c2', title: 'SameSource Card', verification_status: 'conflicted', annual_max_savings: null });
+r = rankPathways({ exploits: [ssCard], pricePoints: [], stateRow: IA, banApplies: true, patient: commercial,
+  conflictsByExploitId: { c2: [{ conflict_class: 'same_official_source', value_a: '3283', value_b: '6097', resolved_at: null }] } });
+check('same-source conflicted card stays pending, no number', r.pendingVerification.some((p) => p.title === 'SameSource Card') && !r.ranked.some((p) => p.title === 'SameSource Card'));
+const bareCard = card({ id: 'c3', title: 'Bare Conflicted', verification_status: 'conflicted' });
+r = rankPathways({ exploits: [bareCard], pricePoints: [], stateRow: IA, banApplies: true, patient: commercial, conflictsByExploitId: {} });
+check('conflicted with no conflict rows = strict pending', r.pendingVerification.some((p) => p.title === 'Bare Conflicted'));
+
+// 10. drugCovered branch routing.
+const coveredOnly = card({ title: 'Covered Branch', eligibility_criteria: { requires: 'commercial_insurance', drug_covered: true, excludes_government_programs: true } });
+r = rankPathways({ exploits: [coveredOnly], pricePoints: [], stateRow: IA, banApplies: true, patient: { ...commercial, drugCovered: false } });
+check('plan does not cover -> covered-branch card notApplicable', r.notApplicable.some((p) => p.title === 'Covered Branch'));
+
 console.log(failures === 0 ? '\nRANKING ENGINE: ALL PASS' : `\nRANKING ENGINE: ${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

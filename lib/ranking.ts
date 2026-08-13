@@ -26,6 +26,7 @@ export interface RankingPatient {
   stateCode: string | null;
   incomePctFpl?: number | null;
   householdSize?: number | null;
+  drugCovered?: boolean | null;   // does the patient's plan cover this drug at all (drives branch cards)
 }
 
 export interface RankedPathway {
@@ -65,6 +66,12 @@ function eligibilityNotes(e: any, p: RankingPatient): { viable: boolean; notes: 
   const government = t === 'medicare_part_d' || t === 'medicaid' || t === 'medicare' || t === 'medicare_advantage';
   if (crit.requires === 'commercial_insurance' && !commercial) {
     return { viable: false, notes: [`Requires commercial insurance (your coverage: ${t ?? 'unknown'}).`] };
+  }
+  if (crit.drug_covered === true && p.drugCovered === false) {
+    return { viable: false, notes: ["Requires your plan to cover the drug — yours doesn't."] };
+  }
+  if (crit.drug_covered === false && p.drugCovered === true) {
+    return { viable: false, notes: ["This pathway is for plans that don't cover the drug — yours does."] };
   }
   if (crit.requires === 'cash_pay' || crit.insurance_required === false) {
     notes.push('No insurance required — this is a cash channel.');
@@ -135,8 +142,10 @@ export function rankPathways(input: {
   stateRow: any | null;
   banApplies: boolean;
   patient: RankingPatient;
+  conflictsByExploitId?: Record<string, any[]>;
 }): RankingResult {
   const { exploits, pricePoints, stateRow, banApplies, patient } = input;
+  const conflictsByExploitId = input.conflictsByExploitId ?? {};
 
   // AKS hard-block first — integrated, not reimplemented.
   const { viable, blocked: aksBlocked } = partitionCopayCardsForInsurance(exploits, patient.insuranceType);
@@ -154,22 +163,40 @@ export function rankPathways(input: {
       pendingVerification.push({ title: e.title, reason: `Currently closed/unavailable${e.closed_reason ? ` (${e.closed_reason})` : ''}.` });
       continue;
     }
-    if (e.verification_status !== 'verified_current') {
-      const reason =
-        e.verification_status === 'conflicted'
-          ? 'Program figures conflict between sources — pending human verification, no number is trusted yet.'
-          : e.verification_status === 'verified_historical'
-            ? 'Evidence suggests these terms have changed — pending re-verification.'
-            : 'Not yet verified against the program\'s current terms.';
-      pendingVerification.push({ title: e.title, reason });
-      continue;
-    }
+    // Order matters: fit BEFORE evidence. A row that doesn't fit this
+    // patient is notApplicable regardless of its verification state —
+    // its conflicts are irrelevant to someone it can't serve.
     const elig = eligibilityNotes(e, patient);
     if (!elig.viable) {
       notApplicable.push({ title: e.title, reason: elig.notes[0] ?? 'Not applicable to your coverage.' });
       continue;
     }
-    const notes = [...elig.notes];
+
+    // Conflicted rows split by conflict class (owner grading rule
+    // 2026-08-12): when every open conflict is a tier_mismatch (official
+    // vs third-party), the official figure stays provisionally trusted
+    // and the row RANKS with the conflict noted. Any same_official_source
+    // or unclassified open conflict means no trusted value — the row goes
+    // to pendingVerification and never carries a number.
+    let provisionalConflictNotes: string[] = [];
+    if (e.verification_status === 'conflicted') {
+      const open = (conflictsByExploitId[e.id] ?? []).filter((c: any) => !c.resolved_at);
+      if (open.length === 0 || open.some((c: any) => c.conflict_class !== 'tier_mismatch')) {
+        pendingVerification.push({ title: e.title, reason: 'Program figures conflict between sources — pending human verification, no number is trusted yet.' });
+        continue;
+      }
+      provisionalConflictNotes = open.map((c: any) =>
+        `Official figure ($${c.value_a}) provisionally trusted; a third-party source disagrees ($${c.value_b}) — conflict noted, not treated as final.`,
+      );
+    } else if (e.verification_status !== 'verified_current') {
+      const reason =
+        e.verification_status === 'verified_historical'
+          ? 'Evidence suggests these terms have changed — pending re-verification.'
+          : 'Not yet verified against the program\'s current terms.';
+      pendingVerification.push({ title: e.title, reason });
+      continue;
+    }
+    const notes = [...elig.notes, ...provisionalConflictNotes];
     const monthly = e.patient_price_floor != null ? Number(e.patient_price_floor) : null;
     const oneTime = e.eligibility_criteria?.one_time === true;
     if (e.annual_max_savings != null) {
@@ -270,6 +297,15 @@ export async function rankSavingsPathsForDrug(input: {
 }): Promise<RankingResult> {
   let stateRow: any | null = null;
   let banApplies = false;
+  const exploitIds = input.exploits.map((e: any) => e.id);
+  const conflictsByExploitId: Record<string, any[]> = {};
+  if (exploitIds.length > 0) {
+    const { data: conflicts } = await supabaseAdmin()
+      .from('evidence_conflicts')
+      .select('*')
+      .in('exploit_id', exploitIds);
+    for (const c of conflicts ?? []) (conflictsByExploitId[c.exploit_id] ??= []).push(c);
+  }
   if (input.patient.stateCode) {
     const { data } = await supabaseAdmin()
       .from('state_accumulator_ban_laws')
@@ -292,5 +328,6 @@ export async function rankSavingsPathsForDrug(input: {
     stateRow,
     banApplies,
     patient: input.patient,
+    conflictsByExploitId,
   });
 }
