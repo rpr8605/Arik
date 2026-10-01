@@ -19,6 +19,8 @@ import { getUserId } from '@/lib/session';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
+import { buildPromptRetrievedContext } from '@/lib/chatRetrieval';
+import type { PriceSourceConsent } from '@/lib/pricing/enforcement';
 
 // Created lazily per call - a module-level client crashes Next's
 // build-time page-data collection when env vars aren't present.
@@ -201,7 +203,7 @@ async function retrieveContext(userId: string, intent: Intent, profile: any) {
   const { data: drugs } = await drugQuery;
   const drugIds = (drugs ?? []).map((d) => d.id);
 
-  const [{ data: exploits }, { data: prices }, { data: accumulators }, { data: counterGuidance }] =
+  const [{ data: exploits }, { data: prices }, { data: accumulators }, { data: counterGuidance }, { data: priceSources }] =
     await Promise.all([
       // db/017 added a second sources FK (aks/terms citations) — the embed
       // must name the FK or PostgREST rejects it as ambiguous.
@@ -211,35 +213,37 @@ async function retrieveContext(userId: string, intent: Intent, profile: any) {
       // Tiny reference table (9 rows), always included: counter rejections
       // are reported mid-conversation, not asked about by drug name.
       supabase().from('counter_override_guidance').select('*, sources(*)'),
+      // db/022: consent/staleness rules for source-tagged price rows.
+      // Tiny registry table (one row per adapter), always included.
+      supabase().from('price_sources').select('id, name, enabled, max_staleness_hours, allow_patient_display, allow_ai_processing'),
     ]);
 
-  return { profile, medications, exploits, prices, accumulators, counterGuidance };
+  return { profile, medications, exploits, prices, accumulators, counterGuidance, priceSources };
 }
 
 // --- Step 3: grounded response, only speaks from retrieved context ---
 async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard') {
   const systemPrompt = await loadSystemPrompt();
 
+  // db/022 consent gates are applied inside the builder (lib/chatRetrieval.ts):
+  // stale / display-barred / AI-barred price rows NEVER reach the model.
+  const sourcesById: Record<string, PriceSourceConsent> = {};
+  for (const s of context.priceSources ?? []) sourcesById[s.id] = s;
+  const { payload: retrievedContext } = buildPromptRetrievedContext({
+    exploits: context.exploits ?? [],
+    prices: context.prices ?? [],
+    accumulators: context.accumulators ?? [],
+    counterGuidance: context.counterGuidance ?? [],
+    blockedCards: context.blockedCards ?? [],
+    blockReason: COPAY_CARD_BLOCK_REASON,
+    rankedPathways: context.rankedPathways ?? null,
+    priceSources: sourcesById,
+  });
+
   const groundedInput = `
 USER_PROFILE: ${JSON.stringify(context.profile)}
 USER_MEDICATIONS: ${JSON.stringify(context.medications)}
-RETRIEVED_CONTEXT: ${JSON.stringify({
-    exploits: context.exploits,
-    prices: context.prices,
-    accumulators: context.accumulators,
-    counter_guidance: context.counterGuidance,
-    // Manufacturer copay cards already removed by the AKS hard-block for
-    // government-coverage patients; listed here ONLY so the model can say
-    // accurately why they're absent - never as options.
-    blocked_pathways: (context.blockedCards ?? []).map((e: any) => ({
-      title: e.title,
-      reason: COPAY_CARD_BLOCK_REASON,
-    })),
-    // The ranking engine's output. When present, the model presents
-    // pathways in THIS order with THESE notes - it does not re-rank or
-    // revive blocked/pending rows as options (prompt rule).
-    ranked_pathways: context.rankedPathways ?? null,
-  })}
+RETRIEVED_CONTEXT: ${JSON.stringify(retrievedContext)}
 CONVERSATION_HISTORY: ${JSON.stringify(history)}
 USER_MESSAGE: ${userMessage}
 RESPONSE_FORMAT: ${format} ('card' = guided advocate format per the system
@@ -417,7 +421,16 @@ export async function POST(req: Request) {
     { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: retrievedIds },
   ]);
 
-  return Response.json({ response, sources: context.exploits, corrections, ranked_pathways: ranking, program_phone: programPhone });
+  // excluded_prices is part of the answer (db/022): prices withheld as
+  // stale are said out loud, never silently dropped.
+  return Response.json({
+    response,
+    sources: context.exploits,
+    corrections,
+    ranked_pathways: ranking,
+    excluded_prices: ranking?.excludedPrices ?? [],
+    program_phone: programPhone,
+  });
 }
 
 let cachedPrompt: string | null = null;

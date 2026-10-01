@@ -20,6 +20,7 @@
 
 import { supabaseAdmin } from './supabaseAdmin';
 import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON } from './medicareEligibility';
+import { partitionPricesForConsent, type PriceSourceConsent } from './pricing/enforcement';
 
 export interface RankingPatient {
   insuranceType: string | null;
@@ -53,6 +54,10 @@ export interface RankingResult {
   blocked: { title: string; reason: string }[];
   stateNote: { status: string; headline: string; detail: string | null } | null;
   winner: RankedPathway | null;
+  // db/022 enforcement: fresh-source prices withheld because they were
+  // expired, disabled, or past the source's max_staleness_hours. The
+  // response says which - an exclusion is an answer, not an omission.
+  excludedPrices: { label: string; reason: string }[];
 }
 
 // Shallow eligibility matcher — DELIBERATELY minimal until the fold's full
@@ -143,6 +148,11 @@ export function rankPathways(input: {
   banApplies: boolean;
   patient: RankingPatient;
   conflictsByExploitId?: Record<string, any[]>;
+  // db/022: source consent rules for ingested price rows. Absent for
+  // legacy callers (all-legacy data) - enforcement kicks in only for
+  // rows carrying a price_source_id.
+  priceSources?: Record<string, PriceSourceConsent>;
+  asOf?: string; // clock injection for deterministic tests
 }): RankingResult {
   const { exploits, pricePoints, stateRow, banApplies, patient } = input;
   const conflictsByExploitId = input.conflictsByExploitId ?? {};
@@ -241,14 +251,26 @@ export function rankPathways(input: {
     if (pp.price_type === 'direct_to_patient' && hasDtpExploit) return false;
     return true;
   });
-  const pricePathways = pricePointsToPathways(applicablePrices);
+  // db/022 enforcement: staleness + source consent BEFORE pathway
+  // construction. Only the allowed set ranks; exclusions are reported.
+  const priceConsent = partitionPricesForConsent(applicablePrices, {
+    sourcesById: input.priceSources ?? {},
+    now: input.asOf,
+  });
+  // Labels name the kind of price, never identifiers (ndc/id) - the
+  // exclusion note must not reconstruct the withheld row.
+  const excludedPrices = priceConsent.excludedStale.map((x) => ({
+    label: `${x.row.price_type ?? 'price'}`,
+    reason: x.reason,
+  }));
+  const pricePathways = pricePointsToPathways(priceConsent.allowed);
   ranked.push(...pricePathways);
 
   ranked.sort((a, b) => (a.projectedAnnualCostUsd ?? Infinity) - (b.projectedAnnualCostUsd ?? Infinity));
   // WINNER: lowest projected 3-12 month cost among confident, non-one-time
-  // pathways. A one-time $0 trial is never the "winner" — it's a bridge.
+  // pathways. A one-time $0 trial is never the "winner" - it's a bridge.
   const winner = ranked.find((p) => !p.oneTime && p.projectedAnnualCostUsd != null) ?? null;
-  return { ranked, pendingVerification, notApplicable, blocked, stateNote, winner };
+  return { ranked, pendingVerification, notApplicable, blocked, stateNote, winner, excludedPrices };
 }
 
 function bestMonthlyPrice(pricePoints: any[]): number | null {
@@ -265,6 +287,10 @@ function pricePointsToPathways(pricePoints: any[]): RankedPathway[] {
   }
   const out: RankedPathway[] = [];
   for (const [type, rows] of byType) {
+    // acquisition_benchmark rows (e.g. NADAC) are market benchmarks,
+    // never patient-payable prices - they must not rank as pathways
+    // regardless of source consent flags.
+    if (type === 'acquisition_benchmark') continue;
     // cheapest normalized 30-day price within each type represents it
     const normalized = rows
       .map((r) => ({ r, monthly: r.supply_days ? (Number(r.price_usd) * 30) / r.supply_days : Number(r.price_usd) }))
@@ -299,6 +325,25 @@ export async function rankSavingsPathsForDrug(input: {
   let banApplies = false;
   const exploitIds = input.exploits.map((e: any) => e.id);
   const conflictsByExploitId: Record<string, any[]> = {};
+
+  // db/022: consent/staleness rules for any source-tagged price rows.
+  // Legacy rows (null price_source_id) need no lookup and are unaffected.
+  const priceSources: Record<string, PriceSourceConsent> = {};
+  const sourceIds = [
+    ...new Set(
+      (input.pricePoints ?? [])
+        .map((p: any) => p.price_source_id)
+        .filter((id: any): id is string => typeof id === 'string'),
+    ),
+  ];
+  if (sourceIds.length > 0) {
+    const { data: sources } = await supabaseAdmin()
+      .from('price_sources')
+      .select('id, name, enabled, max_staleness_hours, allow_patient_display, allow_ai_processing')
+      .in('id', sourceIds);
+    for (const s of sources ?? []) priceSources[s.id] = s as PriceSourceConsent;
+  }
+
   if (exploitIds.length > 0) {
     const { data: conflicts } = await supabaseAdmin()
       .from('evidence_conflicts')
@@ -329,5 +374,7 @@ export async function rankSavingsPathsForDrug(input: {
     banApplies,
     patient: input.patient,
     conflictsByExploitId,
+    priceSources,
+    asOf: new Date().toISOString(),
   });
 }

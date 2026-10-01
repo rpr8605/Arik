@@ -57,8 +57,10 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/012_counter_override_guidance.sql` → `db/013_eliquis_dtp_tiers.sql`
 → `db/014_case_outcomes_pharmacy.sql` → `db/015_income_pct_fpl.sql` →
 `db/016_eligibility_screeners.sql` → `db/017_exploits_evidence_fold.sql`
-→ `db/018_bundle_seeds.sql` → `db/019_nv_regulatory_guidance.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–019
+→ `db/018_bundle_seeds.sql` → `db/019_nv_regulatory_guidance.sql` →
+`db/020_conflict_classes.sql` → `db/021_explanation_style_and_support_phone.sql`
+→ `db/022_pricing_ingestion.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–022
 are idempotent). 010 loads owner-verified demo states (IA/ND/CA
 primary_source_verified; NV classified `regulatory_guidance` by the owner
 2026-08-12 via db/019 — not folded into yes/no); the other 48 rows stay
@@ -114,7 +116,7 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 
 ## Key files and their status
 
-- `schema.sql` — 36 tables, single source of truth for the DB. Apply
+- `schema.sql` — 38 tables, single source of truth for the DB. Apply
   first on a fresh project.
 - `db/002_identity_crypto.sql` — pgcrypto extension + `encrypt_identity`/
   `decrypt_identity` helpers (service-role only). Widens
@@ -132,7 +134,11 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   string at the EXTRACTION step — no fact merge, no retrieval, no
   response-model call. Crisis/distress language is always on_topic so it
   reaches the crisis-aware pipeline. `callModel()` (OpenRouter direct,
-  `lib/callModel.ts`) logs one usage line per call.
+  `lib/callModel.ts`) logs one usage line per call. Since db/022
+  (2026-10-01): retrieval also reads `price_sources`, and the
+  RETRIEVED_CONTEXT is built by `lib/chatRetrieval.ts` with the
+  consent/staleness partition applied inside; the API response carries
+  `excluded_prices` (withheld stale prices are said out loud).
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure
@@ -165,7 +171,12 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     cost, never point-in-time; only `verified_current` rows rank;
     conflicted/unresolved rows go to pendingVerification with no number;
     state-ban assertions require `primary_source_verified` (the SQL
-    function has no confidence awareness).
+    function has no confidence awareness). Since 2026-10-01 (db/022):
+    price rows pass the consent/staleness partition in
+    `lib/pricing/enforcement.ts` before pathway construction, excluded
+    stale rows are reported on the result as `excludedPrices`, and
+    `acquisition_benchmark` rows (NADAC-type) never rank as pathways —
+    benchmarks are not patient prices.
   - `extractedFacts.ts` — Feature A merge step (built 2026-07-28): every
     extracted fact → durable profile/case/med row immediately;
     contradictions park in `pending_fact_corrections` (never silent
@@ -185,6 +196,20 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   - `supabaseBrowser.ts` — publishable-key browser client; client comps.
   - `session.ts` — `getUserId(req)`: Bearer JWT or cookie session →
     userId, else null (→ 401). Used by `/api/chat` and `/api/cases/start`.
+  - `apiAuth.ts` — the API auth boundary (Step 0, 2026-10-01): `requireUser`
+    + the `apiDeps` registry every guarded route calls through. The
+    registry is the documented test seam for `scripts/test_auth_guards.ts`;
+    app code must never rebind it.
+  - `chatRetrieval.ts` — builds the chat route's RETRIEVED_CONTEXT. The
+    AI/display consent gates run INSIDE it, so a barred row cannot reach
+    an OpenRouter prompt without bypassing the one function the route calls.
+  - `pricing/adapter.ts` — source-agnostic `PriceSourceAdapter` contract
+    (fetch/normalize → `NormalizedPrice`; rejects are logged, never
+    coerced), `pricing/adapters/` (registry + `nadac.ts`; field mapping
+    with per-field sources and UNVERIFIED marks in the header),
+    `pricing/enforcement.ts` — pure `partitionPricesForConsent()`
+    (staleness + `allow_patient_display`/`allow_ai_processing` gates,
+    tested by `scripts/test_pricing_enforcement.ts`).
 - `app/` — `login` (magic link + password), `auth/callback`, `page.tsx`
   (case list + guided-entry front door + `PlanTypeSelector`
   coverage control), `cases/[id]` (+ Thread, DocumentUpload,
@@ -236,7 +261,15 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   verbatim; broad on-topic questions still reach the response model),
   `load_state_corroboration.mjs` (fills corroboration_count/source_pass_ids
   on secondary state-ban rows from the reconciliation JSON; never touches
-  verified/flagged rows). Node scripts read
+  verified/flagged rows), `test_auth_guards.ts` (Step 0 per-route 401/404
+  proofs, serverless), `ingest_prices.ts` (pricing ingest runner:
+  `--source <id> [--file] [--dry-run]`; ARIK_PG* env only, never the
+  remote), `test_nadac.ts` (fixture-only adapter tests),
+  `test_pricing_enforcement.ts` (staleness + AI/display gates),
+  `test_ingest_integration.mjs` (runner CLI vs local arik-pg),
+  `local_pg_apply.mjs` + `local_pg_bootstrap.sql` (bare-Postgres local dev
+  stack; emulates auth/roles/cron/Storage, filters pg_cron/pg_net
+  create-extension lines locally). Node scripts read
   `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),
@@ -250,10 +283,13 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   first-class 'failed' rows, 502), `managed-patients` PATCH
   (extended-retention opt-in/out, session-authed, ledgered),
   `jobs/purge-expired-uploads` (service-key bearer only; deletes expired
-  raw Storage objects, keeps rows). `/api/chat` and
-  `/api/cases/start` enforce auth via
-  `lib/session.ts`; the rest still carry the AUTH NOTE (userId from
-  request) until their UIs land — do not deploy publicly before then.
+  raw Storage objects, keeps rows). **Every API route enforces session
+  auth (Step 0, 2026-10-01)**: routes resolve the caller only via
+  `lib/apiAuth.ts`'s `requireUser` (the old request-supplied userId is
+  ignored everywhere), case-scoped routes check `canAccessCase()` in
+  `lib/cases.ts` (owner or managing caregiver; stranger and nonexistent
+  get the same 404), and `scripts/test_auth_guards.ts` proves 401/403/404
+  per route (33 checks, serverless, via the apiDeps test seam).
 - `chat_system_prompt.md` — loaded at runtime; contains hard rules,
   crisis-awareness standing instruction, required trust-receipt section.
   Keep all three intact if edited.
@@ -266,6 +302,16 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 ## Toolchain quirks (cost real time, don't rediscover)
 
 - Node 24 + npm 11. Dependencies are exact-pinned; keep the lockfile.
+  `@types/pg` is a devDependency (exact pin) because the `.ts` ingest
+  runner imports `pg` — the package ships no bundled types.
+- Local dev database: `docker run -d --name arik-pg -e POSTGRES_PASSWORD=postgres
+  -e POSTGRES_DB=arik -p 127.0.0.1:54329:5432 postgres:16`, then
+  `node scripts/local_pg_apply.mjs 022` (fresh) or `--only 022`
+  (incremental; schema.sql is one-shot). The bootstrap emulates Supabase
+  roles/auth/cron/Storage; pg_cron and pg_net `create extension` lines in
+  db/009 are filtered LOCALLY ONLY (stubbed cron schema records schedules
+  in cron.job). Port 54329 avoids the beacon-relay postgres on 5432 —
+  do not touch that container.
 - **TypeScript must stay on 5.x** (currently 5.9.3). `typescript@7`
   (native preview) crashes `next build`'s type-check step with a cryptic
   "id argument must be of type string" worker error.

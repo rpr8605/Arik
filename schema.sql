@@ -227,13 +227,21 @@ create table user_medications (
 create table price_points (
   id uuid primary key default gen_random_uuid(),
   drug_id uuid references drugs(id),
-  price_type text not null,           -- 'list', 'ira_negotiated', 'cash_pay', 'nadac', 'medicare_part_d', 'direct_to_patient' (db/013: manufacturer-run cash channel)
+  price_type text not null,           -- 'list', 'ira_negotiated', 'cash_pay', 'nadac', 'medicare_part_d', 'direct_to_patient' (db/013: manufacturer-run cash channel), 'acquisition_benchmark' (db/022: NADAC-type benchmarks, never patient prices)
   dose text,
   supply_days int,
   unit_count int,                     -- db/013: tablets/capsules per fill; distinguishes same-day-supply tiers (e.g. Eliquis DTP 60 vs 74 tabs, both 30-day)
   price_usd numeric,
   effective_date date,
   source_id uuid references sources(id),
+  -- db/022 (pricing ingestion): which registered source fed this row +
+  -- observation/expiry dates for staleness enforcement. source_id above
+  -- stays the CITATION; price_source_id is the INGESTION source (FK to
+  -- price_sources added below, after that table exists).
+  price_source_id uuid,
+  ndc text check (ndc is null or ndc ~ '^\d{11}$'),
+  observed_at date,
+  expires_at date,
   created_at timestamptz default now()
 );
 
@@ -629,6 +637,44 @@ create table pending_fact_corrections (
   created_at timestamptz default now(),
   resolved_at timestamptz
 );
+
+-- ============================================================
+-- PRICING INGESTION (db/022, 2026-10-01)
+-- ============================================================
+
+-- Source registry: one row per adapter in lib/pricing/adapters/.
+-- max_staleness_hours bounds row age at read time; retention_days is a
+-- hard purge window (purge_price_ingest_retention, db/022); the two
+-- allow_* flags are consent gates enforced in lib/pricing/enforcement.ts.
+create table price_sources (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,              -- the adapter id, e.g. 'nadac'
+  enabled boolean not null default true,
+  max_staleness_hours int,
+  retention_days int,
+  allow_patient_display boolean not null default true,
+  allow_ai_processing boolean not null default true,
+  notes text,
+  created_at timestamptz default now()
+);
+
+-- Raw staging: exactly what a source sent, before normalization.
+-- Rejected records are kept with status='rejected' + error - rejections
+-- are logged, never silent. Service-role only (ingestion internals).
+create table raw_price_ingest (
+  id uuid primary key default gen_random_uuid(),
+  source_id uuid not null references price_sources(id),
+  payload jsonb not null,
+  received_at timestamptz default now(),
+  status text not null default 'received'
+    check (status in ('received', 'normalized', 'rejected', 'upserted', 'failed')),
+  error text,
+  source_record_ref text
+);
+
+-- Deferred FK (same pattern as authorizations_on_file/case_outcomes above).
+alter table price_points
+  add constraint fk_price_points_price_source foreign key (price_source_id) references price_sources(id);
 
 -- ============================================================
 -- CONSENT LEDGER (per SECURITY.md as cited by DATA_RETENTION.md)
