@@ -119,7 +119,10 @@ $fn$;
 do $$
 begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    perform cron.unschedule('purge-price-ingest-retention');
+    -- db/009's idempotent pattern: named unschedule ERRORS on a missing
+    -- job (found on real pg_cron, local Supabase 2026-10-01), so guard it.
+    perform cron.unschedule('purge-price-ingest-retention')
+      where exists (select 1 from cron.job where jobname = 'purge-price-ingest-retention');
     perform cron.schedule('purge-price-ingest-retention', '40 3 * * *',
       $job$select purge_price_ingest_retention();$job$);
   else

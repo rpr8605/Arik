@@ -20,9 +20,9 @@ const env = loadEnv(new URL('../.env.local', import.meta.url));
 const recon = JSON.parse(readFileSync(new URL('../docs/research/state-law-reconciliation.json', import.meta.url), 'utf8'));
 
 const client = new pg.Client({
-  host: env.SUPABASE_DB_HOST, port: 5432, user: 'postgres',
+  host: env.SUPABASE_DB_HOST, port: Number(env.SUPABASE_DB_PORT ?? 5432), user: 'postgres',
   password: env.SUPABASE_DB_PASSWORD, database: 'postgres',
-  ssl: { rejectUnauthorized: false },
+  ssl: env.SUPABASE_DB_SSL === 'off' ? false : { rejectUnauthorized: false },
 });
 await client.connect();
 let updated = 0, skipped = 0;

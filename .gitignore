@@ -7,3 +7,7 @@ node_modules/
 dev-server.log
 tsconfig.tsbuildinfo
 .vercel
+
+.env.remote.backup
+
+supabase/.temp/

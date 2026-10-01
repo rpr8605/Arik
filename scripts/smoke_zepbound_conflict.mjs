@@ -24,7 +24,7 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 const pgClient = new pg.Client({
   host: env.SUPABASE_DB_HOST, port: 5432, user: 'postgres',
   password: env.SUPABASE_DB_PASSWORD, database: 'postgres',
-  ssl: { rejectUnauthorized: false },
+  ssl: env.SUPABASE_DB_SSL === 'off' ? false : { rejectUnauthorized: false },
 });
 
 let failures = 0;

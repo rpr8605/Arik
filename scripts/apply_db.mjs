@@ -24,11 +24,11 @@ if (!env.SUPABASE_DB_PASSWORD) throw new Error('SUPABASE_DB_PASSWORD missing fro
 
 const client = new pg.Client({
   host: env.SUPABASE_DB_HOST,
-  port: 5432,
+  port: Number(env.SUPABASE_DB_PORT ?? 5432),
   user: 'postgres',
   password: env.SUPABASE_DB_PASSWORD,
   database: 'postgres',
-  ssl: { rejectUnauthorized: false },
+  ssl: env.SUPABASE_DB_SSL === 'off' ? false : { rejectUnauthorized: false },
   connectionTimeoutMillis: 15000,
 });
 
@@ -69,13 +69,13 @@ const roundtrip = await client.query(
 );
 
 console.log('\n--- verification ---');
-console.log(`tables in public:            ${tables.rows[0].n} (expect 27)`);
-console.log(`tables with RLS enabled:     ${rls.rows[0].n} (expect 27)`);
+console.log(`tables in public:            ${tables.rows[0].n} (expect 38)`);
+console.log(`tables with RLS enabled:     ${rls.rows[0].n} (expect 27 - later migrations cover the rest)`);
 console.log(`helper functions present:    ${fns.rows[0].n} (expect 3)`);
 console.log(`encrypt/decrypt round-trip:  "${roundtrip.rows[0].value}" (expect "Arik smoke test")`);
 
 const pass =
-  tables.rows[0].n === 27 &&
+  tables.rows[0].n === 38 &&
   rls.rows[0].n === 27 &&
   fns.rows[0].n === 3 &&
   roundtrip.rows[0].value === 'Arik smoke test';

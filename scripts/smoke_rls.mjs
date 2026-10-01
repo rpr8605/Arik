@@ -21,11 +21,11 @@ function loadEnv(path) {
 const env = loadEnv(new URL('../.env.local', import.meta.url));
 const client = new pg.Client({
   host: env.SUPABASE_DB_HOST,
-  port: 5432,
+  port: Number(env.SUPABASE_DB_PORT ?? 5432),
   user: 'postgres',
   password: env.SUPABASE_DB_PASSWORD,
   database: 'postgres',
-  ssl: { rejectUnauthorized: false },
+  ssl: env.SUPABASE_DB_SSL === 'off' ? false : { rejectUnauthorized: false },
   connectionTimeoutMillis: 15000,
 });
 

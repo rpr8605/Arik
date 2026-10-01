@@ -145,9 +145,9 @@ if (isMain) {
     if (m && !m[1].startsWith('#')) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
   }
   const client = new pg.Client({
-    host: env.SUPABASE_DB_HOST, port: 5432, user: 'postgres',
+    host: env.SUPABASE_DB_HOST, port: Number(env.SUPABASE_DB_PORT ?? 5432), user: 'postgres',
     password: env.SUPABASE_DB_PASSWORD, database: 'postgres',
-    ssl: { rejectUnauthorized: false },
+    ssl: env.SUPABASE_DB_SSL === 'off' ? false : { rejectUnauthorized: false },
   });
   await client.connect();
   const fx = ZEPBOUND_CONFLICT_FIXTURE;

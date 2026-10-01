@@ -22,9 +22,9 @@ const EMAIL = 'flow_smoke@example.invalid';
 const PASSWORD = 'smoke-pass-123';
 
 const pgClient = new pg.Client({
-  host: env.SUPABASE_DB_HOST, port: 5432, user: 'postgres',
+  host: env.SUPABASE_DB_HOST, port: Number(env.SUPABASE_DB_PORT ?? 5432), user: 'postgres',
   password: env.SUPABASE_DB_PASSWORD, database: 'postgres',
-  ssl: { rejectUnauthorized: false },
+  ssl: env.SUPABASE_DB_SSL === 'off' ? false : { rejectUnauthorized: false },
 });
 
 let failures = 0;
