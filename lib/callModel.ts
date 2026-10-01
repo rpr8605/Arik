@@ -19,6 +19,7 @@ export async function callModel(opts: {
   system?: string;
   images?: ModelImage[];
   maxTokens?: number; // per-call override (document extraction needs more than the chat-extraction default); the tier default holds otherwise
+  timeoutMs?: number; // per-call override; the tier's timeoutMs holds otherwise
 }): Promise<string> {
   const spec = MODEL_TIERS[opts.tier];
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -37,22 +38,39 @@ export async function callModel(opts: {
         ]
       : opts.prompt;
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: spec.slug,
-      messages: [
-        ...(opts.system ? [{ role: 'system', content: opts.system }] : []),
-        { role: 'user', content: userContent },
-      ],
-      max_tokens: opts.maxTokens ?? spec.maxTokens,
-      provider: { sort: 'price', max_price: spec.maxPrice },
-    }),
-  });
+  // Standing rule: no unbounded waits. A hung OpenRouter connection
+  // aborts at the tier's timeoutMs and throws a clear error - it never
+  // silently pins the route open.
+  const timeoutMs = opts.timeoutMs ?? spec.timeoutMs;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: spec.slug,
+        messages: [
+          ...(opts.system ? [{ role: 'system', content: opts.system }] : []),
+          { role: 'user', content: userContent },
+        ],
+        max_tokens: opts.maxTokens ?? spec.maxTokens,
+        provider: { sort: 'price', max_price: spec.maxPrice },
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') {
+      throw new Error(`OpenRouter ${opts.tier} call timed out after ${timeoutMs}ms`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) {
     const body = await res.text();
