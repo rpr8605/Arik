@@ -45,7 +45,7 @@ async function main() {
     err?.message ?? '');
   check('abort fired near the configured timeout (not instantly, not never)',
     elapsed >= 100 && elapsed < 3000, `${elapsed}ms`);
-  check('the fetch received our abort signal', signalSeen instanceof AbortSignal);
+  check('the fetch received our abort signal', (signalSeen as unknown) instanceof AbortSignal);
 
   // 2. Fast, well-formed response: unaffected by the timeout wrapper.
   globalThis.fetch = (async () => ({
