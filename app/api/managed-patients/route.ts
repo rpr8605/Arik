@@ -1,32 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createManagedPatient, listManagedPatients } from '@/lib/caregivers';
-import { getUserId } from '@/lib/session';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { recordConsent } from '@/lib/consent';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { apiDeps, notFound, requireUser, unauthorized } from '@/lib/apiAuth';
 
-// AUTH NOTE: see app/api/cases/route.ts - auth guard lands with Phase 1.
-// (PATCH below already uses the session guard; GET/POST keep the legacy
-// pattern until their UIs land.)
+// Auth (Step 0, 2026-10-01): the caregiver is the session user on every
+// method - the old caregiverUserId parameter let anyone list or create
+// managed patients under someone else's account.
 
 export async function GET(req: NextRequest) {
-  const caregiverUserId = req.nextUrl.searchParams.get('caregiverUserId');
-  if (!caregiverUserId) {
-    return NextResponse.json({ error: 'caregiverUserId is required' }, { status: 400 });
-  }
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   try {
-    return NextResponse.json({ managedPatients: await listManagedPatients(caregiverUserId) });
+    return NextResponse.json({ managedPatients: await apiDeps.listManagedPatients(userId) });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   try {
     const body = await req.json();
-    if (!body.caregiverUserId || !body.patientName) {
-      return NextResponse.json({ error: 'caregiverUserId and patientName are required' }, { status: 400 });
+    if (!body.patientName) {
+      return NextResponse.json({ error: 'patientName is required' }, { status: 400 });
     }
-    const created = await createManagedPatient(body.caregiverUserId, {
+    const created = await apiDeps.createManagedPatient(userId, {
       patientName: body.patientName,
       relationship: body.relationship,
       zipCode: body.zipCode,
@@ -41,8 +40,8 @@ export async function POST(req: NextRequest) {
 // that exempts a managed patient's cases from the 90-day post-resolution
 // purge. Every change is consent-ledgered, opt-in AND opt-out.
 export async function PATCH(req: NextRequest) {
-  const userId = await getUserId(req);
-  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
 
   const body = await req.json();
   const managedPatientId = typeof body.managedPatientId === 'string' ? body.managedPatientId : '';
@@ -62,7 +61,7 @@ export async function PATCH(req: NextRequest) {
     .eq('id', managedPatientId)
     .eq('caregiver_user_id', userId)
     .maybeSingle();
-  if (!mp) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  if (!mp) return notFound();
 
   const { error } = await sb
     .from('managed_patients')

@@ -45,6 +45,24 @@ export async function listManagedPatients(caregiverUserId: string): Promise<Mana
   return (data ?? []) as ManagedPatient[];
 }
 
+// API auth boundary (Step 0, 2026-10-01): does this managed-patient
+// record belong to this caregiver? Checked before a case is created
+// against someone else's managed patient (service-role path bypasses
+// RLS, so the check lives in code).
+export async function ownsManagedPatient(
+  caregiverUserId: string,
+  managedPatientId: string,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .from('managed_patients')
+    .select('id')
+    .eq('id', managedPatientId)
+    .eq('caregiver_user_id', caregiverUserId)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
 export async function getAuthorizationStatus(
   managedPatientId: string,
   entityName: string,

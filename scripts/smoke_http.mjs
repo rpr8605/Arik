@@ -30,15 +30,32 @@ function check(name, cond, detail = '') {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? ' - ' + detail : ''}`);
   if (!cond) failures++;
 }
-async function api(method, path, body) {
+async function api(method, path, body, token) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   let json = null;
   try { json = await res.json(); } catch { /* empty body */ }
   return { status: res.status, json };
+}
+
+// Real auth path (Step 0, 2026-10-01): every guarded route resolves the
+// caller from the session; request-supplied userId fields are ignored.
+// Sign in with the fixture user's password, same as the browser would.
+async function signIn(email, password) {
+  const res = await fetch(`${env.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const json = await res.json();
+  if (!json.access_token) throw new Error(`sign-in failed: ${JSON.stringify(json)}`);
+  return json.access_token;
 }
 
 await pgClient.connect();
@@ -52,53 +69,60 @@ await pgClient.query(
   [USER],
 );
 console.log(`smoke target: ${BASE}\n`);
+const token = await signIn('http_smoke@example.invalid', 'smoke');
 
-// 1. Create a case
-const created = await api('POST', '/api/cases', { userId: USER, caseType: 'prescription_savings' });
+// 0. Auth boundary: no session -> 401 (the Step 0 guard).
+const noAuth = await api('POST', '/api/cases', { caseType: 'prescription_savings' });
+check('POST /api/cases without a session returns 401', noAuth.status === 401, `status ${noAuth.status}`);
+
+// 1. Create a case (userId comes from the session, not the body)
+const created = await api('POST', '/api/cases', { userId: '00000000-0000-0000-0000-000000000000', caseType: 'prescription_savings' }, token);
+check('POST /api/cases ignores body userId and still creates for the session user',
+  created.status === 201 && created.json?.case?.user_id === USER, `status ${created.status}, user_id ${created.json?.case?.user_id}`);
 check('POST /api/cases creates case', created.status === 201 && created.json?.case?.status === 'gathering_evidence', `status ${created.status}`);
 const caseId = created.json?.case?.id;
 
 // 2. Illegal transition -> 409
-const illegal = await api('PATCH', `/api/cases/${caseId}`, { to: 'resolved_won' });
+const illegal = await api('PATCH', `/api/cases/${caseId}`, { to: 'resolved_won' }, token);
 check('PATCH gathering_evidence -> resolved_won returns 409', illegal.status === 409, `status ${illegal.status}`);
 
 // 3. Legal transition -> 200
-const legal = await api('PATCH', `/api/cases/${caseId}`, { to: 'action_ready' });
+const legal = await api('PATCH', `/api/cases/${caseId}`, { to: 'action_ready' }, token);
 check('PATCH gathering_evidence -> action_ready returns 200', legal.status === 200 && legal.json?.case?.status === 'action_ready', `status ${legal.status}`);
 
 // 4. Deadline with a known payer rule -> stored with countdown
-const dl = await api('POST', `/api/cases/${caseId}/deadlines`, { noticeDate: '2026-07-01', payerName: 'UHC', planType: 'employer' });
+const dl = await api('POST', `/api/cases/${caseId}/deadlines`, { noticeDate: '2026-07-01', payerName: 'UHC', planType: 'employer' }, token);
 check('POST deadlines (UHC) stores deadline with days_remaining', dl.status === 201 && dl.json?.stored === true && typeof dl.json?.daysRemaining === 'number',
   dl.json?.stored ? `filing ${dl.json?.deadline?.filing_deadline}, ${dl.json?.daysRemaining}d remaining, basis: ${(dl.json?.basis ?? '').slice(0, 60)}...` : JSON.stringify(dl.json));
 check('UHC deadline is flagged sourceUnverified (honest basis)', dl.json?.sourceUnverified === true);
 
 // 5. Unknown payer -> honest no_rule, NOT a guessed deadline
-const noRule = await api('POST', `/api/cases/${caseId}/deadlines`, { noticeDate: '2026-07-01', payerName: 'Acme Unknown Mutual', planType: 'medicaid' });
+const noRule = await api('POST', `/api/cases/${caseId}/deadlines`, { noticeDate: '2026-07-01', payerName: 'Acme Unknown Mutual', planType: 'medicaid' }, token);
 check('POST deadlines (unknown payer) returns no_rule, nothing stored', noRule.status === 200 && noRule.json?.stored === false && noRule.json?.reason === 'no_rule');
 
 // 6. Only the one real deadline is listed
-const list = await api('GET', `/api/cases/${caseId}/deadlines`);
+const list = await api('GET', `/api/cases/${caseId}/deadlines`, null, token);
 check('GET deadlines lists exactly the 1 stored deadline', list.status === 200 && (list.json?.deadlines ?? []).length === 1, `${(list.json?.deadlines ?? []).length} row(s)`);
 
 // 7. Identity write -> masked read (booleans, never values)
-const put = await api('PUT', '/api/identity', { userId: USER, fields: { full_name: 'Http Smoke', date_of_birth: '1970-01-01' } });
+const put = await api('PUT', '/api/identity', { userId: '00000000-0000-0000-0000-000000000000', fields: { full_name: 'Http Smoke', date_of_birth: '1970-01-01' } }, token);
 check('PUT /api/identity saves + returns masked fields', put.status === 200 && put.json?.identity?.full_name === true && put.json?.identity?.email === false);
-const getId = await api('GET', `/api/identity?userId=${USER}`);
+const getId = await api('GET', '/api/identity', null, token);
 check('GET /api/identity never returns plaintext values', getId.status === 200 && !JSON.stringify(getId.json).includes('Http Smoke') && !JSON.stringify(getId.json).includes('1970-01-01'));
 
 // 8. Terminal state: close, then confirm reopening is illegal
-await api('PATCH', `/api/cases/${caseId}`, { to: 'submitted' });
-const closed = await api('PATCH', `/api/cases/${caseId}`, { to: 'closed_by_patient' });
+await api('PATCH', `/api/cases/${caseId}`, { to: 'submitted' }, token);
+const closed = await api('PATCH', `/api/cases/${caseId}`, { to: 'closed_by_patient' }, token);
 check('terminal PATCH flags outcome_confirmation_required', closed.json?.outcome_confirmation_required === true, JSON.stringify(closed.json?.outcome_confirmation_required));
-const reopen = await api('PATCH', `/api/cases/${caseId}`, { to: 'gathering_evidence' });
+const reopen = await api('PATCH', `/api/cases/${caseId}`, { to: 'gathering_evidence' }, token);
 check('PATCH closed_by_patient -> gathering_evidence returns 409 (terminal)', reopen.status === 409, `status ${reopen.status}`);
 
 // 8b. Outcome confirmation loop: record pharmacy + amount, patient confirms
-const oc = await api('POST', '/api/outcomes', { caseId, fields: { revisedAmountOwedUsd: 0, pharmacyUsed: 'Costco' } });
+const oc = await api('POST', '/api/outcomes', { caseId, fields: { revisedAmountOwedUsd: 0, pharmacyUsed: 'Costco' } }, token);
 check('POST /api/outcomes records amount + pharmacy_used', oc.status === 201 && oc.json?.outcome?.pharmacy_used === 'Costco' && oc.json?.outcome?.revised_amount_owed_usd !== null, `status ${oc.status}`);
 const outcomeId = oc.json?.outcome?.id;
 check('new outcome starts unconfirmed (patient gate)', oc.json?.outcome?.patient_confirmed === false);
-const conf = await api('POST', '/api/outcomes', { outcomeId, patientConfirmed: true });
+const conf = await api('POST', '/api/outcomes', { outcomeId, patientConfirmed: true }, token);
 check('patient confirmation flips patient_confirmed', conf.status === 200 && conf.json?.outcome?.patient_confirmed === true, `status ${conf.status}`);
 check('confirmed outcome carries a timestamp', Boolean(conf.json?.outcome?.created_at));
 // (The "prompt silenced after confirmation" case is covered by the pure
@@ -106,7 +130,7 @@ check('confirmed outcome carries a timestamp', Boolean(conf.json?.outcome?.creat
 // negative path can't be re-exercised over HTTP.)
 
 // 9. Privacy deletion removes everything the user touched
-const del = await api('DELETE', `/api/privacy?userId=${USER}`);
+const del = await api('DELETE', '/api/privacy', null, token);
 const deletedTotal = Object.values(del.json?.deleted ?? {}).reduce((a, b) => a + b, 0);
 check('DELETE /api/privacy removes user data', del.status === 200 && deletedTotal >= 3, `deleted: ${JSON.stringify(del.json?.deleted)}`);
 

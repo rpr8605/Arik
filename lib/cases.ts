@@ -108,6 +108,33 @@ export async function getCase(id: string): Promise<ArikCase | null> {
   return data as ArikCase | null;
 }
 
+// API auth boundary (Step 0, 2026-10-01): mirrors the db/005
+// can_access_case() RLS predicate for the service-role code path - route
+// handlers use supabaseAdmin (which BYPASSES RLS), so ownership must be
+// enforced in code before any case-scoped read or write. Same rule as
+// the SQL function: the case owner, or the caregiver of the managed
+// patient the case belongs to.
+export async function canAccessCase(userId: string, caseId: string): Promise<boolean> {
+  const sb = supabaseAdmin();
+  const { data: kase, error } = await sb
+    .from('cases')
+    .select('user_id, managed_patient_id')
+    .eq('id', caseId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!kase) return false;
+  if (kase.user_id === userId) return true;
+  if (!kase.managed_patient_id) return false;
+  const { data: mp, error: mpErr } = await sb
+    .from('managed_patients')
+    .select('id')
+    .eq('id', kase.managed_patient_id)
+    .eq('caregiver_user_id', userId)
+    .maybeSingle();
+  if (mpErr) throw mpErr;
+  return !!mp;
+}
+
 export async function listCases(userId: string): Promise<ArikCase[]> {
   const sb = supabaseAdmin();
   const { data: own, error: ownErr } = await sb

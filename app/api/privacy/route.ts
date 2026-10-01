@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { clearDemographicCategory, deleteAllUserData } from '@/lib/privacy';
+import { apiDeps, requireUser, unauthorized } from '@/lib/apiAuth';
 
-// AUTH NOTE: see app/api/cases/route.ts - auth guard lands with Phase 1.
-// These are destructive endpoints; the auth guard and an explicit
-// confirmation step (UI_UX.md) must land before any public deploy.
+// Auth (Step 0, 2026-10-01): these are destructive endpoints and they
+// act on the SESSION user's data only. Before this guard, anyone who
+// knew or guessed a user id could wipe that user's entire record -
+// the exact hole the AUTH NOTE warned about. UI_UX.md's explicit
+// confirmation step is a client concern; the server-side guarantee is
+// that only the owner can trigger the deletion.
 
 export async function DELETE(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get('userId');
-  if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   try {
-    const deleted = await deleteAllUserData(userId);
+    const deleted = await apiDeps.deleteAllUserData(userId);
     return NextResponse.json({ deleted });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
@@ -17,12 +20,14 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   try {
     const body = await req.json();
-    if (!body.userId || !body.category) {
-      return NextResponse.json({ error: 'userId and category are required' }, { status: 400 });
+    if (!body.category) {
+      return NextResponse.json({ error: 'category is required' }, { status: 400 });
     }
-    return NextResponse.json(await clearDemographicCategory(body.userId, body.category));
+    return NextResponse.json(await apiDeps.clearDemographicCategory(userId, body.category));
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

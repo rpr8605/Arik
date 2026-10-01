@@ -73,6 +73,19 @@ export async function confirmOutcome(outcomeId: string, confirmed: boolean) {
   return data;
 }
 
+// API auth boundary (Step 0, 2026-10-01): the ownership of an outcome is
+// derived through its case - the confirm path needs the case_id before
+// canAccessCase can run.
+export async function getOutcomeCaseId(outcomeId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin()
+    .from('case_outcomes')
+    .select('case_id')
+    .eq('id', outcomeId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.case_id as string | undefined) ?? null;
+}
+
 export async function listOutcomes(caseId: string) {
   const { data, error } = await supabaseAdmin()
     .from('case_outcomes')

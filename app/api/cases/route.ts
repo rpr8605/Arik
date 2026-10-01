@@ -1,30 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createCase, listCases, CASE_TYPES, type CaseType } from '@/lib/cases';
+import { CASE_TYPES, type CaseType } from '@/lib/cases';
+import { apiDeps, notFound, requireUser, unauthorized } from '@/lib/apiAuth';
 
-// AUTH NOTE: Phase 1 wires Supabase auth; until then userId comes from
-// the request. Do not deploy publicly before the auth guard lands.
+// Auth (Step 0, 2026-10-01): the caller is the session user, never a
+// request parameter. Request-supplied userId fields are ignored.
 
 export async function GET(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get('userId');
-  if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   try {
-    return NextResponse.json({ cases: await listCases(userId) });
+    return NextResponse.json({ cases: await apiDeps.listCases(userId) });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   try {
     const body = await req.json();
-    if (!body.userId || !CASE_TYPES.includes(body.caseType)) {
+    if (!CASE_TYPES.includes(body.caseType)) {
       return NextResponse.json(
-        { error: `userId and a valid caseType (${CASE_TYPES.join(' | ')}) are required` },
+        { error: `a valid caseType (${CASE_TYPES.join(' | ')}) is required` },
         { status: 400 },
       );
     }
-    const created = await createCase({
-      userId: body.userId,
+    // A case may only be filed against a managed patient the caller
+    // actually manages.
+    if (body.managedPatientId && !(await apiDeps.ownsManagedPatient(userId, body.managedPatientId))) {
+      return notFound();
+    }
+    const created = await apiDeps.createCase({
+      userId,
       caseType: body.caseType as CaseType,
       managedPatientId: body.managedPatientId,
       amountAtRiskUsd: body.amountAtRiskUsd,

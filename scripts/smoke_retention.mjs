@@ -66,7 +66,7 @@ const { rows: [kase] } = await pgClient.query(
 async function transition(id, to) {
   const res = await fetch(`${BASE}/api/cases/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ to }),
   });
   return { status: res.status, json: await res.json() };
@@ -118,8 +118,8 @@ await pgClient.query(
 );
 const clear = await fetch(`${BASE}/api/privacy`, {
   method: 'PATCH',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userId: USER, category: 'race' }),
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ userId: USER, category: 'race' }), // userId ignored post-Step-0; the session user is the target
 });
 check('demographic clear returns 200', clear.status === 200);
 const { rows: demoLedger } = await pgClient.query(
