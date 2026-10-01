@@ -1,0 +1,83 @@
+{
+  "_comment": "Synthetic fixture shaped like the DKAN datastore response (verified live 2026-10-01). NDCs/prices are invented test values, not real NADAC figures. Rows 0-2 are valid; rows 3-8 exercise every reject path (see scripts/test_nadac.ts).",
+  "results": [
+    {
+      "ndc_description": "APIXABAN 5 MG TABLET",
+      "ndc": "00004026611",
+      "nadac_per_unit": "9.51000",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "EA",
+      "pharmacy_type_indicator": "C/I",
+      "otc": "N",
+      "explanation_code": "1",
+      "classification_for_rate_setting": "B",
+      "as_of_date": "2026-09-24"
+    },
+    {
+      "ndc_description": "EMPAGLIFLOZIN 10 MG TABLET",
+      "ndc": "00093-104-01",
+      "nadac_per_unit": "14.22500",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "EA",
+      "pharmacy_type_indicator": "C/I",
+      "otc": "N",
+      "explanation_code": "1",
+      "classification_for_rate_setting": "G",
+      "as_of_date": "2026-09-24"
+    },
+    {
+      "ndc_description": "ROSUVASTATIN 20 MG TABLET",
+      "ndc": "13668015205",
+      "nadac_per_unit": "0.08300",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "EA",
+      "pharmacy_type_indicator": "C/I",
+      "otc": "N",
+      "explanation_code": "1",
+      "classification_for_rate_setting": "G",
+      "as_of_date": "2026-09-24"
+    },
+    {
+      "ndc_description": "BROKEN ROW - SHORT NDC",
+      "ndc": "123",
+      "nadac_per_unit": "1.00",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "EA"
+    },
+    {
+      "ndc_description": "MISSING PRICE ROW",
+      "ndc": "00000000001",
+      "nadac_per_unit": "",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "EA"
+    },
+    {
+      "ndc_description": "ZERO PRICE ROW",
+      "ndc": "00000000002",
+      "nadac_per_unit": "0",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "EA"
+    },
+    {
+      "ndc_description": "BAD DATE ROW",
+      "ndc": "00000000003",
+      "nadac_per_unit": "1.00",
+      "effective_date": "not-a-date",
+      "pricing_unit": "EA"
+    },
+    {
+      "ndc_description": "",
+      "ndc": "00000000004",
+      "nadac_per_unit": "1.00",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "EA"
+    },
+    {
+      "ndc_description": "NON-EA UNIT ROW",
+      "ndc": "00000000005",
+      "nadac_per_unit": "1.00",
+      "effective_date": "2026-09-15",
+      "pricing_unit": "GM"
+    }
+  ]
+}
