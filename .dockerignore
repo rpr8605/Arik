@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env*.local
+.vercel
+.firecrawl
+dev-server.log
+tsconfig.tsbuildinfo
+Dockerfile
+docker-compose.yml
+infra

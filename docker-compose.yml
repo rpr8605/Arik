@@ -1,0 +1,30 @@
+# Local run of the Arik app container (AWS readiness, 2026-10-05).
+#
+# The database is NOT in this file. Locally, run the Supabase stack with
+# the Supabase CLI (`supabase start`) and point .env.local at it. On AWS,
+# Supabase runs self-hosted beside the app (see infra/aws/README.md).
+#
+#   docker compose --env-file .env.local up --build
+#
+# From inside the container, a Supabase stack on the host machine is at
+# host.docker.internal, not localhost.
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+        APP_VERSION: ${APP_VERSION:-local}
+    ports:
+      - "3000:3000"
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      IDENTITY_ENCRYPTION_KEY: ${IDENTITY_ENCRYPTION_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      MODEL_TIMEOUT_MS: ${MODEL_TIMEOUT_MS:-60000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

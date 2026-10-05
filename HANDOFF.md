@@ -1,5 +1,16 @@
 # HANDOFF: Arik Build (Master Index)
 
+> **Update 2026-10-05:** `ARIK_MASTER_SPEC.md` is now the top-level spec -
+> read it first. It defines every module, acceptance criterion and stage
+> gate; the stage build prompts are its Appendix B (run in order; B2 and
+> B3 can run in parallel after B1). Completeness audits live in
+> `docs/status/`; the AWS plan lives in `infra/aws/`. The "Not a runnable
+> app" section below is out of date: the Next.js app exists and builds as
+> a standalone container (see the Dockerfile). Background reading:
+> `ARIK_MASTER_SPEC.md`, plus the older research packs
+> `Arik_Accumulator_Ban_and_Program_Terms_Research.md` and
+> `Arik_Health_Drug_Bundle_Build_Ticket.md`.
+
 Read this file first, then CASE_MODEL.md, then the rest as referenced
 below. This document was rewritten after a full consistency pass across
 every spec doc in this repo - the schema.sql that used to accompany the
@@ -58,6 +69,9 @@ elderly-first defaults - its one schema need is a
 `user_matching_profile.preferred_language` field, additive). UI_UX.md is
 the surface-level spec (case list home, trust receipt placement, Tier 2
 confirm pattern). AGENTS.md holds OpenCode-specific working instructions.
+arik_health_discount_search_master_list.md is the research-side sourcing
+playbook (source tiers, per-program-type search targets, assertion
+language, re-verification cadence) behind the exploits/pricing data.
 None of these define database tables, but read them before building the
 corresponding feature.
 

@@ -6,6 +6,13 @@ The repo is now a **spec + early app**: Next.js 16 (App Router, Turbopack)
 + TypeScript strict scaffold exists at repo root, but there is no live
 Arik database yet — see "Supabase target project" below.
 
+## Master spec (2026-10-05)
+
+`ARIK_MASTER_SPEC.md` defines every module, acceptance criterion and
+stage gate. Stage build prompts are its Appendix B - run in order (B2 and
+B3 can run in parallel after B1). Completeness audits go in
+`docs/status/`.
+
 ## Gate before any application code
 
 1. `python scripts\validate_repo.py` must pass with 0 failures (script
