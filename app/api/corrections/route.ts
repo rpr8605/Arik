@@ -9,7 +9,7 @@
 //   dismiss -> keep the existing value, close the correction
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId } from '@/lib/session';
+import { apiDeps, requireUser, unauthorized } from '@/lib/apiAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 const ALLOWED_TARGETS: Record<string, string[]> = {
@@ -19,8 +19,8 @@ const ALLOWED_TARGETS: Record<string, string[]> = {
 };
 
 export async function POST(req: NextRequest) {
-  const userId = await getUserId(req);
-  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
 
   const body = await req.json();
   const id = typeof body.id === 'string' ? body.id : '';
@@ -29,12 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "id and action ('confirm'|'dismiss') are required" }, { status: 400 });
   }
 
-  const sb = supabaseAdmin();
-  const { data: correction } = await sb
-    .from('pending_fact_corrections')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  const correction = await apiDeps.getPendingCorrection(id);
   // Owner only - a correction is meaningless (and a write vector) for
   // anyone else, caregiver included.
   if (!correction || correction.user_id !== userId) {
@@ -44,6 +39,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `already ${correction.status}` }, { status: 409 });
   }
 
+  // The admin client is created only after the request is known to be
+  // legitimate (keeps 401/404 paths free of any data-layer touch).
+  const sb = supabaseAdmin();
   const now = new Date().toISOString();
 
   if (action === 'dismiss') {

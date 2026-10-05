@@ -15,7 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { callModel } from '@/lib/callModel';
-import { getUserId } from '@/lib/session';
+import { apiDeps, requireUser } from '@/lib/apiAuth';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
@@ -267,27 +267,21 @@ export async function POST(req: Request) {
   // session, and resolves the case from it (case-scoped extracted facts
   // land on the case; pre-case facts are staged per
   // CONVERSATIONAL_ENTITY_EXTRACTION.md).
-  const userId = await getUserId(req);
+  const userId = await requireUser(req);
   if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 });
   const { message, sessionId } = await req.json();
 
-  const { data: session } = await supabase()
-    .from('chat_sessions')
-    .select('id, case_id')
-    .eq('id', sessionId)
-    .maybeSingle();
-  // Unknown session used to surface as a downstream FK-violation 500;
-  // now that the session drives the fact merge, say so plainly.
+  // Ownership gate (M01-AC2, audit fix 2026-10-05): the service-role
+  // client bypasses RLS, so the session row is resolved through a helper
+  // that returns it only when the session user owns it (or manages the
+  // patient the session's case belongs to). Unknown and not-yours are the
+  // same 404 - a stranger cannot enumerate session ids.
+  const session = await apiDeps.getOwnedChatSession(userId, sessionId);
   if (!session) return Response.json({ error: 'unknown session' }, { status: 404 });
 
   // Profile is fetched once up front: language preference is needed even
-  // on short-circuit paths. select('*') keeps this working before the
-  // preferred_language column exists (Feature B migration).
-  const { data: profile } = await supabase()
-    .from('user_matching_profile')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  // on short-circuit paths.
+  const profile = await apiDeps.getChatProfile(userId);
   const lang = responseLanguage(profile);
 
   const intent = await extractIntent(message);

@@ -1,0 +1,50 @@
+// Chat session ownership (M01-AC2, audit fix 2026-10-05): the chat route
+// uses the service-role client, which BYPASSES RLS, so session ownership
+// is enforced here in code before any session-scoped read or write.
+//
+// A session is visible to its owning user, or to the caregiver of the
+// managed patient the session's case belongs to (the same rule as
+// lib/cases.ts canAccessCase, mirroring db/005 can_access_case). A
+// stranger gets the same null as a missing session, so the route answers
+// one indistinguishable 404.
+
+import { supabaseAdmin } from './supabaseAdmin';
+import { canAccessCase } from './cases';
+
+export interface ChatSessionRef {
+  id: string;
+  user_id: string | null;
+  case_id: string | null;
+}
+
+export async function getOwnedChatSession(
+  userId: string,
+  sessionId: string,
+): Promise<ChatSessionRef | null> {
+  const { data: session, error } = await supabaseAdmin()
+    .from('chat_sessions')
+    .select('id, user_id, case_id')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!session) return null;
+  if (session.user_id === userId) return session as ChatSessionRef;
+  if (session.case_id && (await canAccessCase(userId, session.case_id))) {
+    return session as ChatSessionRef;
+  }
+  return null;
+}
+
+// The chat route's one up-front profile read (language, insurance type,
+// explanation style). Behind the apiDeps seam so the auth boundary is
+// testable without a database. select('*') keeps this working regardless
+// of which profile migrations have landed.
+export async function getChatProfile(userId: string): Promise<any | null> {
+  const { data, error } = await supabaseAdmin()
+    .from('user_matching_profile')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}

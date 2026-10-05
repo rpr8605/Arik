@@ -21,6 +21,14 @@ import {
   POST as managedPost,
   PATCH as managedPatch,
 } from '../app/api/managed-patients/route';
+import { POST as chatPost } from '../app/api/chat/route';
+import { POST as documentsPost } from '../app/api/cases/[id]/documents/route';
+import { POST as correctionsPost } from '../app/api/corrections/route';
+import { GET as preferencesGet, PUT as preferencesPut } from '../app/api/preferences/route';
+import { PUT as insuranceTypePut } from '../app/api/profile/insurance-type/route';
+import { POST as casesStartPost } from '../app/api/cases/start/route';
+import { GET as healthGet } from '../app/api/health/route';
+import { POST as purgePost } from '../app/api/jobs/purge-expired-uploads/route';
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = '') {
@@ -39,13 +47,14 @@ function restore() {
 const A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'; // session user
 const B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'; // the other user
 
-function fakeReq(opts: { url?: string; body?: unknown } = {}): any {
+function fakeReq(opts: { url?: string; body?: unknown; formData?: boolean } = {}): any {
   const url = new URL(opts.url ?? 'http://localhost/api/x');
   return {
     nextUrl: url,
     url: url.toString(),
     headers: new Headers(),
     json: async () => opts.body ?? {},
+    formData: async () => new FormData(),
   };
 }
 const noSession = { getUserId: async () => null };
@@ -218,6 +227,93 @@ await expect401('managed-patients PATCH: unauthenticated -> 401', () => managedP
 // PATCH cross-user: already guarded before Step 0 (ownership subquery on
 // caregiver_user_id -> notFound); exercising it needs a live DB, so it
 // stays covered by the ownership check itself + the smoke suite.
+
+// --- /api/chat (M01-AC2 audit fix 2026-10-05: session ownership gate) ---
+await expect401('chat POST: unauthenticated -> 401', () => chatPost(fakeReq({ body: { message: 'x', sessionId: 's1' } })));
+{
+  stub({ ...asA, getOwnedChatSession: (async () => null) as any });
+  const res = await chatPost(fakeReq({ body: { message: 'x', sessionId: 'session-b' } }));
+  restore();
+  check("chat POST: B's session id -> 404 (indistinguishable from missing)", res.status === 404, `status ${res.status}`);
+}
+{
+  let seen: any = null;
+  stub({
+    ...asA,
+    getOwnedChatSession: (async (uid: string, sid: string) => { seen = { uid, sid }; return { id: sid, user_id: uid, case_id: 'c1' }; }) as any,
+    // Sentinel: proves the handler got PAST the ownership gate and reached
+    // the next data-layer call. Never returns, so no model call can fire.
+    getChatProfile: (async () => { throw new Error('sentinel: reached profile load'); }) as any,
+  });
+  let caught = '';
+  try { await chatPost(fakeReq({ body: { message: 'x', sessionId: 's-own' } })); } catch (e) { caught = (e as Error).message; }
+  restore();
+  check('chat POST: owned session passes the gate (profile load reached as session user A)',
+    seen?.uid === A && seen?.sid === 's-own' && caught === 'sentinel: reached profile load',
+    `seen=${JSON.stringify(seen)} caught=${caught}`);
+}
+
+// --- /api/cases/[id]/documents ---
+await expect401('documents POST: unauthenticated -> 401', () => documentsPost(fakeReq(), paramsFor('c1')));
+{
+  stub({ ...asA, canAccessCase: (async () => false) as any });
+  const res = await documentsPost(fakeReq(), paramsFor('c1'));
+  restore();
+  check("documents POST: B's case -> 404", res.status === 404, `status ${res.status}`);
+}
+{
+  stub({ ...asA, canAccessCase: (async () => true) as any });
+  const res = await documentsPost(fakeReq({ formData: true }), paramsFor('c1'));
+  restore();
+  check('documents POST: own case passes the gate (400 = reached file validation)', res.status === 400, `status ${res.status}`);
+}
+
+// --- /api/corrections ---
+await expect401('corrections POST: unauthenticated -> 401', () => correctionsPost(fakeReq({ body: { id: 'p1', action: 'dismiss' } })));
+{
+  stub({ ...asA, getPendingCorrection: (async () => null) as any });
+  const res = await correctionsPost(fakeReq({ body: { id: 'missing', action: 'dismiss' } }));
+  restore();
+  check('corrections POST: unknown id -> 404', res.status === 404, `status ${res.status}`);
+}
+{
+  stub({ ...asA, getPendingCorrection: (async () => ({ id: 'p1', user_id: B, status: 'pending' })) as any });
+  const res = await correctionsPost(fakeReq({ body: { id: 'p1', action: 'dismiss' } }));
+  restore();
+  check("corrections POST: B's correction -> 404 (owner-only route)", res.status === 404, `status ${res.status}`);
+}
+
+// --- /api/preferences (self-scoped: every query keys on the session user) ---
+await expect401('preferences GET: unauthenticated -> 401', () => preferencesGet(fakeReq()));
+await expect401('preferences PUT: unauthenticated -> 401', () => preferencesPut(fakeReq({ body: { preferred_language: 'es' } })));
+
+// --- /api/profile/insurance-type (self-scoped upsert by session user) ---
+await expect401('insurance-type PUT: unauthenticated -> 401', () => insuranceTypePut(fakeReq({ body: { planType: 'medicare' } })));
+
+// --- /api/cases/start ---
+await expect401('cases/start POST: unauthenticated -> 401', () => casesStartPost(fakeReq({ body: { message: 'a bill' } })));
+{
+  let seen: string | null = null;
+  stub({
+    ...asA,
+    // Sentinel stop before the chat_sessions insert: proves which user id
+    // reached case creation without needing a database.
+    createCase: (async (input: any) => { seen = input.userId; throw new Error('sentinel: stop before session insert'); }) as any,
+  });
+  const res = await casesStartPost(fakeReq({ body: { message: 'a bill', userId: B } }));
+  restore();
+  check('cases/start POST: body userId=B ignored, creates as session user A', seen === A && res.status === 500, `seen=${seen} status=${res.status}`);
+}
+
+// --- Explicit exemptions (the only two routes allowed to answer without a session) ---
+{
+  const res = await healthGet(fakeReq());
+  check('health GET: unauthenticated by design (200 or 503, never 401)', res.status === 200 || res.status === 503, `status ${res.status}`);
+}
+{
+  const res = await purgePost(fakeReq());
+  check('purge job POST: service-key bearer only, no header -> 401', res.status === 401, `status ${res.status}`);
+}
 }
 
 main()

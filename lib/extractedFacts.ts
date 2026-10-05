@@ -351,3 +351,20 @@ export async function migrateStagedFactsIntoCase(
 
   return corrections;
 }
+
+// Single-row read for the corrections route (apiDeps seam, audit fix
+// 2026-10-05). Returns the full row: the route needs user_id for the
+// ownership check and target_table/target_id/field/new_value to apply a
+// confirm. Null when no such id - the route folds that into its 404.
+export async function getPendingCorrection(
+  sb: SupabaseClient,
+  id: string,
+): Promise<any | null> {
+  const { data, error } = await sb
+    .from('pending_fact_corrections')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}

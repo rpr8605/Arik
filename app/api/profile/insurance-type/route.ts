@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId } from '@/lib/session';
+import { requireUser, unauthorized } from '@/lib/apiAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 // Demo-scope insurance entry (pre-demo item 3): broad plan type ONLY.
@@ -16,8 +16,8 @@ const PLAN_TYPE_MAP: Record<string, string> = {
 };
 
 export async function PUT(req: NextRequest) {
-  const userId = await getUserId(req);
-  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   const body = await req.json().catch(() => ({}));
   const mapped = PLAN_TYPE_MAP[body?.planType];
   if (!mapped) {

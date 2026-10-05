@@ -12,9 +12,8 @@
 // Privacy Policy - not final. The purge job itself is Feature D.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId } from '@/lib/session';
+import { apiDeps, notFound, requireUser, unauthorized } from '@/lib/apiAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { getCase } from '@/lib/cases';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import {
   detectKind,
@@ -29,25 +28,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const userId = await getUserId(req);
-  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
   const { id: caseId } = await params;
 
   // Owner or caregiver of the managed patient the case belongs to
-  // (mirrors RLS can_access_case).
-  const kase = await getCase(caseId);
-  if (!kase) return NextResponse.json({ error: 'case not found' }, { status: 404 });
-  let allowed = kase.user_id === userId;
-  if (!allowed && kase.managed_patient_id) {
-    const { data: mp } = await supabaseAdmin()
-      .from('managed_patients')
-      .select('id')
-      .eq('id', kase.managed_patient_id)
-      .eq('caregiver_user_id', userId)
-      .maybeSingle();
-    allowed = !!mp;
-  }
-  if (!allowed) return NextResponse.json({ error: 'case not found' }, { status: 404 });
+  // (mirrors RLS can_access_case), via the apiDeps seam.
+  if (!(await apiDeps.canAccessCase(userId, caseId))) return notFound();
 
   const form = await req.formData();
   const file = form.get('file');

@@ -8,7 +8,7 @@
 // are rejected with an explicit 400 rather than silently accepted.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId } from '@/lib/session';
+import { requireUser, unauthorized } from '@/lib/apiAuth';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { recordConsent } from '@/lib/consent';
 
@@ -17,8 +17,8 @@ type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 const EXPLANATION_STYLES = ['standard', 'simple'] as const;
 
 export async function GET(req: NextRequest) {
-  const userId = await getUserId(req);
-  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
 
   const { data: profile } = await supabaseAdmin()
     .from('user_matching_profile')
@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const userId = await getUserId(req);
-  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
 
   const body = await req.json();
   const sb = supabaseAdmin();

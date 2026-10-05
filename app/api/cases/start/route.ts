@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId } from '@/lib/session';
-import { createCase, type CaseType } from '@/lib/cases';
+import { apiDeps, requireUser, unauthorized } from '@/lib/apiAuth';
+import { type CaseType } from '@/lib/cases';
 import { migrateStagedFactsIntoCase } from '@/lib/extractedFacts';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
@@ -20,15 +20,15 @@ function guessCaseType(text: string): CaseType {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = await getUserId(req);
-  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const userId = await requireUser(req);
+  if (!userId) return unauthorized();
 
   const body = await req.json();
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   if (!message) return NextResponse.json({ error: 'message is required' }, { status: 400 });
 
   try {
-    const kase = await createCase({
+    const kase = await apiDeps.createCase({
       userId,
       caseType: guessCaseType(message),
       nextAction: 'Talk it through in the case thread',

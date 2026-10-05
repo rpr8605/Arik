@@ -38,6 +38,9 @@ import {
   listManagedPatients,
   ownsManagedPatient,
 } from './caregivers';
+import { getChatProfile, getOwnedChatSession } from './chatSession';
+import { getPendingCorrection } from './extractedFacts';
+import { supabaseAdmin } from './supabaseAdmin';
 
 export const apiDeps = {
   getUserId,
@@ -60,6 +63,11 @@ export const apiDeps = {
   listManagedPatients,
   createManagedPatient,
   ownsManagedPatient,
+  getOwnedChatSession,
+  getChatProfile,
+  // The corrections route's single-row read; the service client is passed
+  // by the default wrapper so tests stub one plain function.
+  getPendingCorrection: (id: string) => getPendingCorrection(supabaseAdmin(), id),
 };
 
 export function unauthorized() {
