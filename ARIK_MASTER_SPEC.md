@@ -89,6 +89,7 @@ These are enforced in code with tests, not just in prompts.
 | NN-12 | No X12 code descriptions copied; Arik writes its own explanations and links to x12.org | `denial_codes` table rules |
 | NN-13 | Every network call has a timeout (AGENTS.md standing rule) | Code review + tests |
 | NN-14 | No real patient data on infrastructure or AI providers without a signed BAA | Deployment gate (M20) |
+| NN-15 | Arik Agent: chooses only from the action registry; eligibility, money and deadline decisions come from the rules engine, never the model; the patient personally confirms attestations, signatures, payments and marketing opt-ins; channel order official API or program hub, then fax/mail/email, then web forms only where site terms allow; never bypass CAPTCHAs or bot checks; never impersonate the patient; every action leaves a receipt and an audit row | M16 hard rules + permission-level tests (M16-AC1, M16-AC8) |
 
 ### 2.1 Partner data policy (PROPOSED, pending Ryan's confirmation)
 
@@ -114,8 +115,8 @@ Patient uploads a denial letter or EOB (later: pulled through a payer connection
 **J4. Insurance profile**
 Patient enters or photographs an insurance card → BIN/PCN/group identify the PBM; plan type and funding recorded → plan documents uploaded or formulary data matched → insurance becomes one more labeled path in J1 (Confirmed / Plan rules / Estimated / Unknown).
 
-**J5. Arik acts for you**
-Any journey reaches an action (enroll, request, send, renew) → action registry defines required fields, permission level and method → Arik pre-fills → patient approves at the required level → Arik submits through the best channel (API, fax, email, mail, web form last) → receipt and confirmation number stored → failures alert immediately.
+**J5. Arik Agent does the legwork**
+Any journey reaches an action (enroll, request, send, follow up, renew) → the Arik Agent (M16) plans the case's ordered steps, each with a status → it pre-fills forms from confirmed facts, gathers documents and drafts the submission → the patient is asked only for the steps that legally must be theirs: one-tap approval at the step's BEHAVIOR.md tier, with attestations, signatures, payments and marketing opt-ins always performed by the patient personally → the agent submits through the best allowed channel (official API or program hub first, then fax/mail/email, web form last and only where site terms allow) → every action leaves a receipt with a confirmation number and an audit row → the agent follows up automatically, tracks renewals, and alerts on failure.
 
 **J6. Caregiver**
 Caregiver manages a family member's cases with an authorization on file (CAREGIVER_MODE.md); every journey above works on the managed patient's behalf within that authorization.
@@ -238,6 +239,34 @@ Format for each module: **Purpose**, **Existing pieces**, **Spec docs**, **Build
 | M05-AC6 | Duplicate discount cards that route through the same processor are collapsed (BLUE_BUTTON_AND_DISCOUNT_GRAPH.md) | S2 |
 
 **Status:** AC1 DONE (82 assertions pass on 2026-10-05). AC2 UNVERIFIED (needs local DB). Others MISSING.
+
+### M16. Arik Agent (the workhorse)
+
+**Purpose:** an AI agent that does the patient's legwork end to end: plans the steps for each case, fills forms, gathers documents, drafts and submits, follows up, tracks renewals, and asks the patient only for steps that legally must be theirs.
+**Spec docs:** BEHAVIOR.md (autonomy tiers 0 to 3); design doc section "Arik acts for you".
+**Build requirements:** action registry (type, required fields, permission level, method, data shared, reversibility); per-case agent plan; approval screen; receipts in the case timeline with confirmation numbers; audit log.
+**Hard rules (NN-15):** the agent chooses only from the action registry; eligibility, money and deadline decisions come from the rules engine, never the model; the patient personally confirms attestations, signatures, payments and marketing opt-ins; channel order is official API or program hub, then fax/mail/email, then web forms only where site terms allow; never bypass CAPTCHAs or bot checks; never impersonate the patient; every action leaves a receipt and an audit row.
+
+Phased: v1 (S3) prepares and tracks, nothing leaves the system; v2 (S5) sends for the patient; v3 (S6) standing permission for routine actions; v4 (S7) web forms.
+
+| ID | Criterion | Stage |
+| --- | --- | --- |
+| M16-AC1 | Action registry with permission levels mapped to BEHAVIOR.md tiers | S3 |
+| M16-AC2 | Per-case agent plan: ordered steps with status | S3 |
+| M16-AC3 | Form pre-fill from confirmed facts only (test: no unconfirmed value is ever filled) | S3 |
+| M16-AC4 | Program application packets attached to exploits (fillable fields) | S3 |
+| M16-AC5 | Approval screen: one-screen summary, one tap, recorded consent | S3 |
+| M16-AC6 | Receipts and audit log for every action, including failures | S3 |
+| M16-AC7 | Status board and reminder deadlines per case | S3 |
+| M16-AC8 | Tests prove attest, sign, pay and marketing opt-in steps are impossible without the patient | S3 |
+| M16-AC9 | Fax, mail and email channel through a vendor with a BAA | S5 |
+| M16-AC10 | Program API/hub submissions | S5 |
+| M16-AC11 | Automatic follow-ups and renewal tracking | S5 |
+| M16-AC12 | Failure alerts and retries | S5 |
+| M16-AC13 | Standing permission: the patient pre-approves named routine action types, revocable any time; every run still leaves a receipt | S6 |
+| M16-AC14 | Browser-automated form fill with patient approval at final submit, only where site terms allow | S7 |
+
+**Status:** all MISSING.
 
 ### M06. Pricing ingestion pipeline
 
@@ -403,24 +432,6 @@ Format for each module: **Purpose**, **Existing pieces**, **Spec docs**, **Build
 
 **Status:** all MISSING.
 
-### M16. Action framework ("Arik acts for you")
-
-**Purpose:** Arik completes enrollments, requests and submissions for the patient, safely.
-**Spec docs:** BEHAVIOR.md (autonomy tiers 0 to 3); design doc section "Arik acts for you".
-**Build requirements:** action registry (type, required fields, permission level, method, data shared, reversibility); approval screen; receipts in the case timeline with confirmation numbers; audit log; channels in preference order: official API or program hub, then fax/email/mail, then web form with patient approval at final submit. Never: attest, sign, pay, accept marketing opt-ins, bypass CAPTCHAs or site rules, impersonate the patient.
-
-| ID | Criterion | Stage |
-| --- | --- | --- |
-| M16-AC1 | Action registry with permission levels mapped to BEHAVIOR.md tiers | S5 |
-| M16-AC2 | Approval screen: one-screen summary, one tap, recorded consent | S5 |
-| M16-AC3 | Receipts and audit log for every action, including failures | S5 |
-| M16-AC4 | Mail and fax channel through a vendor with a BAA | S5 |
-| M16-AC5 | Program application templates attached to exploits (fillable fields) | S5 |
-| M16-AC6 | Tests prove Tier 3 actions are impossible (attest, sign, pay) | S5 |
-| M16-AC7 | Browser-automated submission, only with patient approval at final submit, only where site terms allow | S7 |
-
-**Status:** all MISSING.
-
 ### M17. Caregiver mode and authorizations
 
 **Existing:** `managed_patients`, `authorizations_on_file`, `lib/caregivers.ts`, `/api/managed-patients`.
@@ -509,7 +520,7 @@ Format for each module: **Purpose**, **Existing pieces**, **Spec docs**, **Build
 | --- | --- | --- | --- |
 | S1 | Demo-ready | Arik runs locally, secured, with a recorded walkthrough | M01-AC1 to AC6, M02-AC1 to AC4, M03-AC1, M04-AC1/3/4/7, M05-AC1/2, M07-AC7, M17-AC1, M20-AC1/2, M22-AC1/4 |
 | S2 | Partner-ready | Any pricing partner plugs in with a small adapter | All S2 criteria in M05, M06, M07 |
-| S3 | Denials and bills v1 | Upload-based denial engine, bill review and letters | All S3 criteria in M03, M04, M09, M10, M11, M12, M18-AC1 |
+| S3 | Denials and bills v1 | Upload-based denial engine, bill review and letters; Arik Agent v1 (prep and track) | All S3 criteria in M03, M04, M09, M10, M11, M12, M16, M18-AC1 |
 | S4 | Pilot-ready | Safe for real patient data on AWS | All S4 criteria (M01, M02, M04-AC2, M09, M18, M20, M21, M22) |
 | S5 | Acts for you + insurance | Action framework, insurance profile, knowledge base | All S5 criteria |
 | S6 | Connected | Record connections, formulary match, Price Integrity Loop | All S6 criteria |
@@ -528,6 +539,7 @@ Stages S2 and S3 can run in parallel after S1. S4 must pass before any real pati
 - pgcrypto application-layer identity encryption (SECURITY.md).
 - Employers are the main revenue; consumer plans per section 1.1; $50 monthly cap on patient fees.
 - Arik does everything up to the legally required patient step (BEHAVIOR.md tiers).
+- Arik Agent is core product; v1 starts in S3.
 - Self-funded plans get a separate federal track; first letter requests the claim file.
 - Denial codes: numbers stored, Arik's own explanations, link to x12.org.
 - Uploads first; record connections after AWS hosting with BAAs; Flexpa when funded.
