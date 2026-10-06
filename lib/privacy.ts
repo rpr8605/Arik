@@ -28,11 +28,15 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   await del('consent_ledger', (q) => q.eq('user_id', userId));
   await del('case_summaries', (q) => q.eq('user_id', userId));
 
+  // Chat rows BEFORE any case deletion: chat_sessions.case_id references
+  // cases(id) with no cascade, so deleting a case first 500s the whole
+  // operation (audit 2026-10-05). Messages by session id, then sessions.
   const { data: sessions } = await sb.from('chat_sessions').select('id').eq('user_id', userId);
   const sessionIds = (sessions ?? []).map((s) => s.id);
   if (sessionIds.length > 0) {
     await del('chat_messages', (q) => q.in('session_id', sessionIds));
   }
+  await del('chat_sessions', (q) => q.eq('user_id', userId));
 
   const { data: userCases } = await sb.from('cases').select('id').eq('user_id', userId);
   const caseIds = (userCases ?? []).map((c) => c.id);
@@ -59,6 +63,14 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
       for (const child of ['case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
         await del(child, (q) => q.in('case_id', managedCaseIds));
       }
+      // Sessions riding on managed cases (keyed by case_id, in case the
+      // session's user_id differs) before those cases go.
+      const { data: mSessions } = await sb.from('chat_sessions').select('id').in('case_id', managedCaseIds);
+      const mSids = (mSessions ?? []).map((s) => s.id);
+      if (mSids.length > 0) {
+        await del('chat_messages', (q) => q.in('session_id', mSids));
+        await del('chat_sessions', (q) => q.in('id', mSids));
+      }
       await del('cases', (q) => q.in('id', managedCaseIds));
     }
     await del('managed_patients', (q) => q.in('id', managedIds));
@@ -78,7 +90,6 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   if (caseIds.length > 0) {
     await del('cases', (q) => q.in('id', caseIds));
   }
-  await del('chat_sessions', (q) => q.eq('user_id', userId));
   await del('user_identity', (q) => q.eq('id', userId));
   await del('user_matching_profile', (q) => q.eq('id', userId));
 
