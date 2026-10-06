@@ -34,11 +34,22 @@ const client = new pg.Client({
 
 await client.connect();
 
-const { rows } = await client.query('select count(*)::int as n from drugs');
-if (rows[0].n > 0) {
-  console.error(`REFUSING TO RUN: drugs table already has ${rows[0].n} row(s). Seed targets an empty table.`);
+const { rows } = await client.query('select name from drugs');
+const existing = new Set(rows.map((r) => String(r.name).toLowerCase()));
+const seedNames = [
+  ...seed.ira_negotiated_2026.map((d) => d.name),
+  ...seed.high_volume_generics_watchlist.map((g) => g.name),
+];
+const overlap = seedNames.filter((n) => existing.has(String(n).toLowerCase()));
+if (overlap.length > 0) {
+  console.error(`REFUSING TO RUN: seed drug name(s) already present: ${overlap.join(', ')}. Re-running would double-seed.`);
   await client.end();
   process.exit(1);
+}
+// Migration-seeded demo bundles (db/013, db/018: Eliquis/Dupixent/Zepbound)
+// coexist with this seed - they never share names with it.
+if (existing.size > 0) {
+  console.log(`drugs table has ${existing.size} pre-existing migration-seeded row(s); no name collisions with this seed, proceeding.`);
 }
 
 await client.query('begin');

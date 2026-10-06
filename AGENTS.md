@@ -66,9 +66,15 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/016_eligibility_screeners.sql` → `db/017_exploits_evidence_fold.sql`
 → `db/018_bundle_seeds.sql` → `db/019_nv_regulatory_guidance.sql` →
 `db/020_conflict_classes.sql` → `db/021_explanation_style_and_support_phone.sql`
-→ `db/022_pricing_ingestion.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–022
-are idempotent). 010 loads owner-verified demo states (IA/ND/CA
+→ `db/022_pricing_ingestion.sql` →
+`db/023_price_sources_defaults_false.sql` → `db/024_nadac_displayable.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–024
+are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
+(scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
+scripts → db/0*.sql, because several migrations patch seeded rows by
+title/name (db/013/017/018/020/021) and match nothing if they run first;
+`npm run db:check` (scripts/db_check.mjs) prints table count, RLS state
+and seeded row counts. 010 loads owner-verified demo states (IA/ND/CA
 primary_source_verified; NV classified `regulatory_guidance` by the owner
 2026-08-12 via db/019 — not folded into yes/no); the other 48 rows stay
 `secondary_aggregated` with
@@ -274,9 +280,11 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   remote), `test_nadac.ts` (fixture-only adapter tests),
   `test_pricing_enforcement.ts` (staleness + AI/display gates),
   `test_ingest_integration.mjs` (runner CLI vs local arik-pg),
-  `local_pg_apply.mjs` + `local_pg_bootstrap.sql` (bare-Postgres local dev
-  stack; emulates auth/roles/cron/Storage, filters pg_cron/pg_net
-  create-extension lines locally). Node scripts read
+`local_pg_apply.mjs` + `local_pg_bootstrap.sql` (bare-Postgres local dev
+stack; emulates auth/roles/cron/Storage, filters pg_cron/pg_net
+create-extension lines locally), `db_reset.mjs` + `db_check.mjs` (the
+`npm run db:reset` / `npm run db:check` local Supabase CLI stack flow),
+`run_tests.mjs` (`npm test`: every test_*.ts suite). Node scripts read
   `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),
