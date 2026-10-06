@@ -99,5 +99,16 @@ const coveredOnly = card({ title: 'Covered Branch', eligibility_criteria: { requ
 r = rankPathways({ exploits: [coveredOnly], pricePoints: [], stateRow: IA, banApplies: true, patient: { ...commercial, drugCovered: false } });
 check('plan does not cover -> covered-branch card notApplicable', r.notApplicable.some((p) => p.title === 'Covered Branch'));
 
+// 11. acquisition_benchmark rows (NADAC-type) are never patient prices
+// (db/024 makes NADAC displayable as the labeled "what pharmacies pay"
+// benchmark; that changes nothing here - ranking.ts:290-293 skips
+// benchmark rows before any pathway exists).
+const benchmark = [{ price_type: 'acquisition_benchmark', price_usd: 9.51, supply_days: 30, sources: { title: 'NADAC', url: 'u', last_verified_at: null } }];
+const cash = [{ price_type: 'cash_pay', price_usd: 45, supply_days: 30, sources: { title: 's', url: 'u', last_verified_at: null } }];
+r = rankPathways({ exploits: [], pricePoints: [...benchmark, ...cash], stateRow: IA, banApplies: false, patient: { insuranceType: 'uninsured', stateCode: 'IA' } });
+check('benchmark never ranked as a patient price', !r.ranked.some((p) => p.monthlyCostUsd === 9.51));
+check('benchmark never wins even when cheapest', r.winner?.monthlyCostUsd !== 9.51);
+check('cash price still ranks', r.ranked.some((p) => p.monthlyCostUsd === 45));
+
 console.log(failures === 0 ? '\nRANKING ENGINE: ALL PASS' : `\nRANKING ENGINE: ${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
