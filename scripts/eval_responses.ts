@@ -59,7 +59,7 @@ async function main() {
   const { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON } = await import('../lib/medicareEligibility');
   const { buildPromptRetrievedContext } = await import('../lib/chatRetrieval');
   const { supabaseAdmin } = await import('../lib/supabaseAdmin');
-  const { generateResponse } = await import('../app/api/chat/route');
+  const { generateGroundedResponse } = await import('../app/api/chat/route');
   type ModelUsage = import('../lib/callModel').ModelUsage;
 
   // Every exploit title, for the foreign-program check.
@@ -67,6 +67,8 @@ async function main() {
 
   let passed = 0;
   let failed = 0;
+  let guardTrips = 0;
+  let guardFallbacks = 0;
   const usages: ModelUsage[] = [];
   const cases = RANKING_EVAL_CASES.filter((k: any) => !onlyCases || onlyCases.includes(k.id));
 
@@ -120,11 +122,17 @@ async function main() {
     };
     let text: string;
     try {
-      text = await generateResponse(
-        `I take ${drugName}. What are my options?`,
-        context, [], 'en', 'standard',
-        (u: ModelUsage) => usages.push(u),
-      );
+      // The full production response path: model + grounding guard +
+      // code-appended boundary line and trust receipt.
+      const result = await generateGroundedResponse({
+        message: `I take ${drugName}. What are my options?`,
+        context, history: [], lang: 'en', format: 'standard',
+        blockedNote: '', ranking,
+        onUsage: (u: ModelUsage) => usages.push(u),
+      });
+      text = result.text;
+      guardTrips += result.guardTrips;
+      if (result.fellBack) guardFallbacks++;
     } catch (e) {
       // A failed/truncated model call is a failed case, not a crashed run.
       console.log(`FAIL ${kase.id}: model call error: ${(e as Error).message.slice(0, 120)}`);
@@ -206,6 +214,7 @@ async function main() {
   const turns = usages.length || 1;
   console.log(`\nmodel: ${modelUsed}`);
   console.log(`${passed} passed, ${failed} failed`);
+  console.log(`grounding guard: ${guardTrips} trip(s), ${guardFallbacks} fallback(s)`);
   console.log(`cost: $${cost.toFixed(4)} total over ${usages.length} turns; avg $${(cost / turns).toFixed(4)}/turn`);
   console.log(`tokens: prompt=${usages.reduce((s, u) => s + u.promptTokens, 0)} cached=${usages.reduce((s, u) => s + u.cachedTokens, 0)} completion=${usages.reduce((s, u) => s + u.completionTokens, 0)}`);
   process.exit(failed > 0 ? 1 : 0);

@@ -15,6 +15,8 @@ import { createClient } from '@supabase/supabase-js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { callModel, type ModelUsage } from '@/lib/callModel';
+import { buildAllowedFacts, withGroundingGuard } from '@/lib/groundingGuard';
+import { buildFallbackOptions, buildTrustReceipt } from '@/lib/trustReceipt';
 import { apiDeps, requireUser } from '@/lib/apiAuth';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
@@ -222,7 +224,7 @@ async function retrieveContext(userId: string, intent: Intent, profile: any) {
 }
 
 // --- Step 3: grounded response, only speaks from retrieved context ---
-export async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard', onUsage?: (u: ModelUsage) => void) {
+export async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard', onUsage?: (u: ModelUsage) => void, retryNote?: string) {
   const systemPrompt = await loadSystemPrompt();
 
   // db/022 consent gates are applied inside the builder (lib/chatRetrieval.ts):
@@ -246,7 +248,7 @@ USER_MEDICATIONS: ${JSON.stringify(context.medications)}
 RETRIEVED_CONTEXT: ${JSON.stringify(retrievedContext)}
 CONVERSATION_HISTORY: ${JSON.stringify(history)}
 USER_MESSAGE: ${userMessage}
-RESPONSE_FORMAT: ${format} ('card' = guided advocate format per the system
+${retryNote ? `REGENERATION NOTE (the previous answer was rejected by the grounding check): ${retryNote}\n` : ''}RESPONSE_FORMAT: ${format} ('card' = guided advocate format per the system
 prompt: one-line answer, numbered action steps, boundary line, then the
 ---DETAILS--- marker. 'standard' = existing structure with the same
 boundary line and marker.)
@@ -258,6 +260,80 @@ rule, not a style preference.
 `;
 
   return callModel({ tier: 'response', system: systemPrompt, prompt: groundedInput, onUsage });
+}
+
+// Grounded response path (S1 hardening, 2026-10-05): the model writes
+// only the explanation; code then checks every figure and program name
+// against the retrieved data (lib/groundingGuard.ts - one regeneration,
+// then a deterministic sourced-options fallback), and appends the
+// boundary line, the AKS block note and the trust receipt built from the
+// ranking engine's own output (lib/trustReceipt.ts). The model never
+// writes the receipt.
+let programTitlesCache: { at: number; titles: string[] } | null = null;
+async function allProgramTitles(): Promise<string[]> {
+  if (programTitlesCache && Date.now() - programTitlesCache.at < 60_000) return programTitlesCache.titles;
+  const { data } = await supabase().from('exploits').select('title');
+  const titles = (data ?? []).map((r: any) => r.title as string);
+  programTitlesCache = { at: Date.now(), titles };
+  return titles;
+}
+
+export async function generateGroundedResponse(opts: {
+  message: string;
+  context: any;
+  history: any[];
+  lang: 'en' | 'es';
+  format: 'card' | 'standard';
+  blockedNote: string;
+  ranking: any;
+  onUsage?: (u: ModelUsage) => void;
+}): Promise<{ text: string; guardTrips: number; regenerated: boolean; fellBack: boolean }> {
+  // Rebuild the prompt payload with the same pure builder and inputs, so
+  // the guard checks against exactly what the model saw.
+  const sourcesById: Record<string, PriceSourceConsent> = {};
+  for (const s of opts.context.priceSources ?? []) sourcesById[s.id] = s;
+  const { payload: retrievedContext } = buildPromptRetrievedContext({
+    exploits: opts.context.exploits ?? [],
+    prices: opts.context.prices ?? [],
+    accumulators: opts.context.accumulators ?? [],
+    counterGuidance: opts.context.counterGuidance ?? [],
+    blockedCards: opts.context.blockedCards ?? [],
+    blockReason: COPAY_CARD_BLOCK_REASON,
+    rankedPathways: opts.context.rankedPathways ?? null,
+    priceSources: sourcesById,
+  });
+  const facts = buildAllowedFacts({
+    retrievedContext,
+    profile: opts.context.profile,
+    knownPrograms: await allProgramTitles(),
+    allowedTitles: (opts.context.exploits ?? []).map((e: any) => e.title),
+  });
+  const guarded = await withGroundingGuard({
+    generate: (retryNote) =>
+      generateResponse(opts.message, opts.context, opts.history, opts.lang, opts.format, opts.onUsage, retryNote),
+    facts,
+    fallback: () => buildFallbackOptions({ ranking: opts.ranking, lang: opts.lang }),
+    log: (line) => console.log(line),
+  });
+
+  // Defensive: a model that still wrote its own ---DETAILS--- section has
+  // it cut before the code-built receipt is appended.
+  let text = guarded.text.split('---DETAILS---')[0].trimEnd();
+  text += opts.blockedNote;
+  // The boundary line is REQUIRED in both modes — guarantee it in code
+  // rather than trusting the model never to drop it.
+  if (!/what i can.t guarantee|lo que no puedo garantizar/i.test(text)) {
+    text +=
+      opts.lang === 'es'
+        ? '\n\nLo que no puedo garantizar: las decisiones de inscripción del programa, la aceptación de la farmacia, ni el precio final exacto en el mostrador.'
+        : "\n\nWhat I can't guarantee: program enrollment decisions, pharmacy acceptance, and the exact final price at the counter.";
+  }
+  text += '\n\n' + buildTrustReceipt({
+    ranking: opts.ranking,
+    exploits: opts.context.exploits ?? [],
+    lang: opts.lang,
+  });
+  return { text, guardTrips: guarded.trips, regenerated: guarded.regenerated, fellBack: guarded.fellBack };
 }
 
 export async function POST(req: Request) {
@@ -393,16 +469,18 @@ export async function POST(req: Request) {
     isGovernmentInsurance(profile?.insurance_type);
   const useCardFormat = profile?.explanation_style === 'simple' || isEliquisMedicare;
 
-  let response =
-    (await generateResponse(message, modelContext, history ?? [], lang, useCardFormat ? 'card' : 'standard')) +
-    blockedNote;
-  // The boundary line is REQUIRED in both modes — guarantee it in code
-  // rather than trusting the model never to drop it.
-  if (!/what i can.t guarantee|lo que no puedo garantizar/i.test(response)) {
-    response +=
-      lang === 'es'
-        ? '\n\nLo que no puedo garantizar: las decisiones de inscripción del programa, la aceptación de la farmacia, ni el precio final exacto en el mostrador.'
-        : "\n\nWhat I can't guarantee: program enrollment decisions, pharmacy acceptance, and the exact final price at the counter.";
+  const guarded = await generateGroundedResponse({
+    message,
+    context: modelContext,
+    history: history ?? [],
+    lang,
+    format: useCardFormat ? 'card' : 'standard',
+    blockedNote,
+    ranking,
+  });
+  const response = guarded.text;
+  if (guarded.fellBack) {
+    console.warn('[chat] grounding guard fell back to deterministic options (counts only)');
   }
 
   // "Call the program" renders only when a cited row carries a real number.

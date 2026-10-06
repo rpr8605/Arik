@@ -149,7 +149,14 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   string at the EXTRACTION step — no fact merge, no retrieval, no
   response-model call. Crisis/distress language is always on_topic so it
   reaches the crisis-aware pipeline. `callModel()` (OpenRouter direct,
-  `lib/callModel.ts`) logs one usage line per call. Since db/022
+  `lib/callModel.ts`) logs one usage line per call (prompt/completion/
+  cached tokens). S1 hardening (2026-10-05): the response model writes
+  only the explanation — `lib/groundingGuard.ts` checks every figure,
+  percentage and program name against the retrieved data (one
+  regeneration with the offenders listed, then a deterministic
+  sourced-options fallback), and the `---DETAILS---` trust receipt is
+  built in code from the ranking output (`lib/trustReceipt.ts`), never by
+  the model. Since db/022
   (2026-10-01): retrieval also reads `price_sources`, and the
   RETRIEVED_CONTEXT is built by `lib/chatRetrieval.ts` with the
   consent/staleness partition applied inside; the API response carries
@@ -268,7 +275,10 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   `test_outcomes.ts` (pure outcome-prompt decision tests),
   `test_ranking.ts` (pure ranking-engine tests),
   `eval_ranking_cases.mjs` + `eval_ranking.ts` (12 ranking eval cases;
-  owner supplies ground truth, nothing self-grades),
+  owner supplies ground truth, nothing self-grades), `eval_responses.ts`
+  (the same 12 cases through the grounded response path: winner+price vs
+  the engine, invented-number inventory, foreign-program check, trust
+  receipt; `--model <slug>` to A/B tiers),
   `smoke_zepbound_conflict.mjs` (live chat: conflicted Zepbound card
   surfaces only as pending-verification, never a trusted number),
   `smoke_scope_boundary.mjs` (2026-08-13: out-of-scope drug gets the
@@ -286,7 +296,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
 stack; emulates auth/roles/cron/Storage, filters pg_cron/pg_net
 create-extension lines locally), `db_reset.mjs` + `db_check.mjs` (the
 `npm run db:reset` / `npm run db:check` local Supabase CLI stack flow),
-`run_tests.mjs` (`npm test`: every test_*.ts suite). Node scripts read
+`run_tests.mjs` (`npm test`: every test_*.ts suite),
+`test_grounding_guard.ts` (guard pass/regenerate/fallback),
+`smoke_privacy_delete.ts` (M18-AC5: full-account deletion e2e). Node scripts read
   `.env.local`; smoke scripts use the auth admin API for fixture users.
 - `app/api/` — thin route wrappers: `cases`, `cases/[id]` (GET/PATCH
   transition), `cases/[id]/deadlines`, `identity` (masked GET/PUT only),
