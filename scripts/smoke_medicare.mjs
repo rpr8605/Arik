@@ -121,7 +121,9 @@ const response = json?.response ?? '';
 check('query returns 200', res.status === 200, `status ${res.status}`);
 check('legal explanation is visible (deterministic block note)', /Why you're not seeing a manufacturer copay card here/.test(response));
 check('the law is named (Anti-Kickback Statute)', /Anti-Kickback Statute/.test(response));
-check('blocked card is named as blocked, not offered', /Blocked for your coverage: Eliquis Co-pay Card/.test(response));
+// The card must be named as blocked (position-independent: db/018's free
+// trial is also blocked for Medicare and may be listed first).
+check('blocked card is named as blocked, not offered', /Blocked for your coverage:[^\n]*Eliquis Co-pay Card/.test(response));
 // Guided-advocate card format (Eliquis+Medicare triggers it): boundary
 // line and details marker are both required, same facts intact.
 check('boundary line present (What I can\'t guarantee…)', /what i can.t guarantee/i.test(response));

@@ -14,7 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { callModel } from '@/lib/callModel';
+import { callModel, type ModelUsage } from '@/lib/callModel';
 import { apiDeps, requireUser } from '@/lib/apiAuth';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
@@ -125,7 +125,7 @@ function normalizeIntent(raw: any): Intent | null {
   };
 }
 
-async function extractIntent(userMessage: string): Promise<Intent | null> {
+export async function extractIntent(userMessage: string): Promise<Intent | null> {
   // The user message is DATA for the extractor, never instructions -
   // delimited explicitly because it is attacker/patient-controlled text.
   const prompt = `Extract structured intent and entities from a patient's
@@ -222,7 +222,7 @@ async function retrieveContext(userId: string, intent: Intent, profile: any) {
 }
 
 // --- Step 3: grounded response, only speaks from retrieved context ---
-async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard') {
+export async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard', onUsage?: (u: ModelUsage) => void) {
   const systemPrompt = await loadSystemPrompt();
 
   // db/022 consent gates are applied inside the builder (lib/chatRetrieval.ts):
@@ -257,7 +257,7 @@ verbatim citation breaks the grounding guarantee; this is a correctness
 rule, not a style preference.
 `;
 
-  return callModel({ tier: 'response', system: systemPrompt, prompt: groundedInput });
+  return callModel({ tier: 'response', system: systemPrompt, prompt: groundedInput, onUsage });
 }
 
 export async function POST(req: Request) {

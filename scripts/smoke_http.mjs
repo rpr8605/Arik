@@ -60,11 +60,17 @@ async function signIn(email, password) {
 
 await pgClient.connect();
 await pgClient.query(
+  // Token columns must be '' not NULL - GoTrue scans them as strings and
+  // a NULL makes /token answer 500 "Database error querying schema".
   `insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
                            email_confirmed_at, created_at, updated_at,
+                           confirmation_token, recovery_token, email_change_token_new,
+                           email_change_token_current, email_change, phone_change,
+                           phone_change_token, reauthentication_token,
                            raw_app_meta_data, raw_user_meta_data)
    values ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-           'http_smoke@example.invalid', crypt('smoke', gen_salt('bf')), now(), now(), now(), '{}', '{}')
+           'http_smoke@example.invalid', crypt('smoke', gen_salt('bf')), now(), now(), now(),
+           '', '', '', '', '', '', '', '', '{}', '{}')
    on conflict (id) do nothing`,
   [USER],
 );

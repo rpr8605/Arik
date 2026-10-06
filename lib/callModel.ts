@@ -13,6 +13,16 @@ export interface ModelImage {
   base64: string;
 }
 
+// Per-call token usage, surfaced to callers that measure cost
+// (scripts/eval_responses.ts) - and logged one line per call below.
+export interface ModelUsage {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  cachedTokens: number;
+  cacheCreationTokens: number;
+}
+
 export async function callModel(opts: {
   tier: ModelTier;
   prompt: string;
@@ -20,6 +30,7 @@ export async function callModel(opts: {
   images?: ModelImage[];
   maxTokens?: number; // per-call override (document extraction needs more than the chat-extraction default); the tier default holds otherwise
   timeoutMs?: number; // per-call override; the tier's timeoutMs holds otherwise
+  onUsage?: (u: ModelUsage) => void; // cost measurement hook (eval harnesses); never feeds back into behavior
 }): Promise<string> {
   const spec = MODEL_TIERS[opts.tier];
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -55,7 +66,18 @@ export async function callModel(opts: {
       body: JSON.stringify({
         model: spec.slug,
         messages: [
-          ...(opts.system ? [{ role: 'system', content: opts.system }] : []),
+          ...(opts.system
+            ? [{
+                role: 'system',
+                // M04-AC4: the response tier's system prompt is long and
+                // identical every turn - mark it cacheable (Anthropic
+                // ephemeral prompt caching, passed through by OpenRouter).
+                // The extraction tier's prompt varies per call; no caching.
+                content: opts.tier === 'response'
+                  ? [{ type: 'text', text: opts.system, cache_control: { type: 'ephemeral' } }]
+                  : opts.system,
+              }]
+            : []),
           { role: 'user', content: userContent },
         ],
         max_tokens: opts.maxTokens ?? spec.maxTokens,
@@ -82,10 +104,22 @@ export async function callModel(opts: {
     throw new Error(`OpenRouter ${opts.tier} returned no content`);
   }
   // One-line usage record per call - shows up in dev server logs and is
-  // what the smoke test reads for real per-call cost accounting.
+  // what the smoke test reads for real per-call cost accounting. Cached
+  // tokens are called out separately (M04-AC4: caching savings must be
+  // visible, not assumed).
+  const usage = json?.usage ?? {};
+  const cachedTokens = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+  const cacheCreationTokens = usage?.cache_creation_input_tokens ?? 0;
   console.log(
     `[callModel] tier=${opts.tier} model=${json.model ?? spec.slug} ` +
-      `tokens=${json?.usage?.prompt_tokens ?? '?'}/${json?.usage?.completion_tokens ?? '?'}`,
+      `tokens=${usage?.prompt_tokens ?? '?'}/${usage?.completion_tokens ?? '?'} cached=${cachedTokens}`,
   );
+  opts.onUsage?.({
+    model: json.model ?? spec.slug,
+    promptTokens: usage?.prompt_tokens ?? 0,
+    completionTokens: usage?.completion_tokens ?? 0,
+    cachedTokens,
+    cacheCreationTokens,
+  });
   return text;
 }

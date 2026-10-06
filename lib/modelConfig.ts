@@ -28,10 +28,17 @@ export const MODEL_TIERS: Record<ModelTier, ModelSpec> = {
   // Step 3: real reasoning model, grounded only in retrieved rows.
   // (Vision document extraction rides this tier with image payloads;
   // 20-40s is typical, 120s is the ceiling.)
+  // maxTokens 2500 (was 1500): the trust receipt must never be truncated -
+  // eval_responses showed both candidate models hitting the 1500 cap and
+  // losing the ---DETAILS--- section on long contexts (2026-10-05).
+  // Sonnet 5.5 (2026-10-05): passed eval_responses at the 4.6 baseline
+  // (8/12 each; 5.5's failures are receipt truncations on long contexts,
+  // 4.6's are invented numbers). Slug and max_price verified against the
+  // OpenRouter models API ($2/$10 per M tokens vs 4.6's $3/$15).
   response: {
-    slug: 'anthropic/claude-sonnet-4.6:floor',
-    maxPrice: { prompt: 3.0, completion: 15.0 },
-    maxTokens: 1500,
+    slug: 'anthropic/claude-sonnet-5.5:floor',
+    maxPrice: { prompt: 2.0, completion: 10.0 },
+    maxTokens: 2500,
     timeoutMs: 120_000,
   },
 };

@@ -35,16 +35,49 @@ function check(name, cond, detail = '') {
 
 await pgClient.connect();
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
-const { data: created, error: createErr } = await admin.auth.admin.createUser({
+let created, createErr;
+({ data: created, error: createErr } = await admin.auth.admin.createUser({
   email: EMAIL, password: PASSWORD, email_confirm: true, user_metadata: { smoke: true },
-});
+}));
+if (createErr && /already been registered/i.test(createErr.message)) {
+  // Leftover from a crashed run. Clean in FK order via SQL (the privacy
+  // cascade currently trips on chat_sessions -> cases ordering - reported
+  // as a product bug 2026-10-05, not worked around in product code here),
+  // then delete the auth user.
+  const { data: list } = await admin.auth.admin.listUsers();
+  const stale = list?.users?.find((u) => u.email === EMAIL);
+  if (stale) {
+    const { rows: sessions } = await pgClient.query('select id from chat_sessions where user_id = $1', [stale.id]);
+    const sids = sessions.map((s) => s.id);
+    if (sids.length) await pgClient.query('delete from chat_messages where session_id = any($1)', [sids]);
+    await pgClient.query('delete from chat_sessions where user_id = $1', [stale.id]);
+    const { rows: staleCases } = await pgClient.query('select id from cases where user_id = $1', [stale.id]);
+    const cids = staleCases.map((c) => c.id);
+    if (cids.length) {
+      for (const t of ['case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
+        await pgClient.query(`delete from ${t} where case_id = any($1)`, [cids]);
+      }
+      await pgClient.query('delete from cases where id = any($1)', [cids]);
+    }
+    await pgClient.query('delete from user_matching_profile where id = $1', [stale.id]);
+    await pgClient.query('delete from user_identity where id = $1', [stale.id]);
+    const { error: delErr } = await admin.auth.admin.deleteUser(stale.id);
+    if (delErr) throw delErr;
+  }
+  ({ data: created, error: createErr } = await admin.auth.admin.createUser({
+    email: EMAIL, password: PASSWORD, email_confirm: true, user_metadata: { smoke: true },
+  }));
+}
 if (createErr) throw createErr;
 const USER = created.user.id;
 
-// 1. Unauthenticated: / redirects to /login, /login renders, APIs 401.
+// 1. Unauthenticated: / renders under an anonymous-first session
+// (proxy.ts signs cookieless visitors in anonymously since 2026-08-13 -
+// the old "redirects to /login" expectation is stale), /login renders,
+// APIs still 401 without a session.
 const homeAnon = await fetch(`${BASE}/`, { redirect: 'manual' });
-check('GET / unauthenticated redirects to /login',
-  [301, 302, 303, 307, 308].includes(homeAnon.status) && (homeAnon.headers.get('location') ?? '').includes('/login'),
+check('GET / unauthenticated renders (anonymous session) or redirects to /login',
+  homeAnon.status === 200 || ([301, 302, 303, 307, 308].includes(homeAnon.status) && (homeAnon.headers.get('location') ?? '').includes('/login')),
   `status ${homeAnon.status} -> ${homeAnon.headers.get('location')}`);
 const loginPage = await fetch(`${BASE}/login`);
 check('GET /login renders', loginPage.status === 200 && (await loginPage.text()).includes('Sign in'));
