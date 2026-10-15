@@ -37,6 +37,39 @@ check('foreign program name flagged', findUnmatchedClaims('Try the Zepbound Savi
 check('small structural numbers never flagged', findUnmatchedClaims('Option 1: fill a 30-day supply, take 5 mg twice daily.', facts).length === 0);
 check('phone-shaped numbers never flagged', findUnmatchedClaims('Call 800-555-1234 for the program.', facts).length === 0);
 
+// --- Review fix C2: identifiers, dates and contact details are not facts ---
+{
+  // The review probe: the only real figure is $3,000; everything else is
+  // id / timestamp / zip / phone noise that used to whitelist invented prices.
+  const noisy = buildAllowedFacts({
+    retrievedContext: {
+      exploits: [{
+        id: '3f2a1c10-9b25-4e8d-a150-7d2e30f45b99', title: 'Card', annual_max_savings: 3000,
+        source_id: '45aa1c10-9b25-4e8d-a150-7d2e30f45b99', last_verified_at: '2026-10-05T14:30:25.123Z',
+        support_phone: '1-855-354-7847', effective_date: '2026-01-01',
+        eligibility_notes: 'Updated 2026-08-12; see https://example.com/terms/2045?id=150',
+      }],
+    },
+    profile: { insurance_type: 'employer', state: 'MO', zip_code: '64111', updated_at: '2026-10-14T19:52:40Z' },
+  });
+  const invented = ['$10/month', '$25 per fill', '$30', '$45', '$99', '$150', '$2026', '$64111', '$855', '$2045', '$14'];
+  const leaked = invented.filter((c) => findUnmatchedClaims(`You pay ${c}.`, noisy).length === 0);
+  check('C2: invented prices are flagged despite id/timestamp/zip/phone/url noise', leaked.length === 0, `passed: ${leaked.join(', ') || 'none'}`);
+  check('C2: the one real figure still passes ($3,000 and $3K)', findUnmatchedClaims('The cap is $3,000 a year ($3K).', noisy).length === 0);
+}
+{
+  // Real figures written inside free text (program terms) still count.
+  const textFacts = buildAllowedFacts({
+    retrievedContext: { exploits: [{ title: 'PAP', eligibility_notes: 'Household income up to 400% FPL; saves up to $13,000 a year; $35 per month cap.' }] },
+    profile: null,
+  });
+  check('C2: numbers inside program text are allowed', findUnmatchedClaims('If income is under 400% FPL you could save up to $13,000, or pay $35 a month.', textFacts).length === 0);
+  check('C2: decimal money matches with or without trailing zero', findUnmatchedClaims('About $13.50 per fill.', buildAllowedFacts({ retrievedContext: { ranked_pathways: [{ monthlyCostUsd: 13.5 }] }, profile: null })).length === 0);
+}
+check('C2: verification dates and plain years in the reply are not flagged', findUnmatchedClaims('Verified 2026-10-05; the 2026 Part D cap applies.', facts).length === 0);
+check('C2: a year written as money is still checked', findUnmatchedClaims('That costs $2025.', facts).includes('$2025'));
+check('C2: phone with a leading 1- is not flagged', findUnmatchedClaims('Call 1-855-354-7847 today.', facts).length === 0);
+
 // --- withGroundingGuard flow ---
 const fb = () => 'FALLBACK: sourced options only.';
 
