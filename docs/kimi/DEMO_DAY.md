@@ -35,6 +35,12 @@ This is a **demo-day cut** of the plans already approved (call card, demo 5a, DE
   5. **Tasha, denied MRI**: denial appeal (stage 4).
 - A simple **"Past jobs" list** on each sample patient (just a list, not the full patient home): job name, status chip, date, outcome with an "Illustrative example" tag.
 
+### Added to stage 1 (owner, 2026-10-15)
+
+- **Home copy:** settings move behind a gear in the header (44px) next to EN | ES, including "How Arik talks to me". Case cards in plain words (bold drug or topic, one line on what's happening, one on what to tap), every internal status mapped in one place (`lib/caseCard.ts`) with a test that no raw status reaches the screen. Chat box placeholder: "Ask about a prescription, a bill, or a denial." Jargon audit of home, case and chat screens.
+- **Chat polish:** bubbles (patient right, Arik left with the A mark); a "+" next to the reply box replaces the "Add a document" card; case header shows the drug in title case and the plain status line.
+- **Demo document picker (DEMO_MODE only):** "+" opens a "Sample documents" sheet styled like a phone photo library. Only our fictional documents, with a SAMPLE tag: Luis hospital bill, Luis doctor bill, Tasha denial letter, Tasha EOB, plus a sample pharmacy receipt and insurance card if they exist. Missing ones stay hidden. "Take a photo" is a fake camera view (frame, shutter, the sample bill in view). Picking plays the scan animation and routes into bill review or denial. No upload, no storage write; the server refuses real uploads in DEMO_MODE (tested). Outside DEMO_MODE, real upload is unchanged. The picker shell ships in stage 1; the documents and their flows are filled in during stages 3 and 4 (`lib/demo/sampleDocs.ts`).
+
 ## Stage 2: Call card (lite)
 
 - Replace the bare phone number with the program call card:

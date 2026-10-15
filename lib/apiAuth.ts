@@ -43,6 +43,8 @@ import { deleteStylePrefs, getStylePrefs, saveStylePrefs } from './stylePrefs';
 import { getPendingCorrection } from './extractedFacts';
 import { supabaseAdmin } from './supabaseAdmin';
 import { consumeRateLimit } from './rateLimit';
+import { getCaseSample, listSampleCases, openSampleCase, resetSampleSession, touchSampleCase } from './demo/sampleCases';
+import { isDemoMode } from './demo/samples';
 
 export const apiDeps = {
   getUserId,
@@ -79,6 +81,14 @@ export const apiDeps = {
   // Rate limits + demo model budget (lib/rateLimit.ts, db/026). Called
   // right after requireUser on chat, documents and cases/start.
   consumeRateLimit,
+  // Demo sample patients (DEMO_DAY stage 1, db/028). isDemoMode reads
+  // DEMO_MODE; it is in the registry so tests can switch it.
+  isDemoMode: () => isDemoMode(),
+  getCaseSample,
+  touchSampleCase,
+  listSampleCases,
+  openSampleCase,
+  resetSampleSession,
 };
 
 export function unauthorized() {

@@ -36,6 +36,8 @@ async function main() {
   check('documents: shares the combined anonymous model cap with chat', byBucket(docs, 'model:anon:day')?.limit_anon === 200);
 
   const start = planChecks('cases_start', U, 'iphash', env);
+  const samples = planChecks('samples', U, 'iphash', env);
+  check('samples: 30/hour, day 60 anonymous / 200 signed in, no model cap', byBucket(samples, 'samples:user:burst')?.limit_anon === 30 && byBucket(samples, 'samples:user:day')?.limit_anon === 60 && byBucket(samples, 'samples:user:day')?.limit_authed === 200 && !samples.some((c) => c.bucket === 'model:anon:day'));
   check('cases/start: 10/hour, day 20 anonymous / 100 signed in', byBucket(start, 'cases_start:user:burst')?.window_seconds === 3600 && byBucket(start, 'cases_start:user:burst')?.limit_anon === 10 && byBucket(start, 'cases_start:user:day')?.limit_anon === 20 && byBucket(start, 'cases_start:user:day')?.limit_authed === 100);
   check('cases/start: no model cap and no IP check (no model call)', !byBucket(start, 'model:anon:day') && !start.some((c) => c.bucket.includes(':ip:')));
 

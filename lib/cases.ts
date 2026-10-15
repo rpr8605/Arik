@@ -164,7 +164,10 @@ export async function listCases(userId: string): Promise<ArikCase[]> {
 
   const byId = new Map<string, ArikCase>();
   for (const c of [...(own ?? []), ...managedCases] as ArikCase[]) byId.set(c.id, c);
-  return [...byId.values()];
+  // Demo sample cases (db/028) live in the sample picker, never in "Your
+  // cases". Filtered here, not in SQL, so this still works on a database
+  // without the is_sample column.
+  return [...byId.values()].filter((c) => !(c as { is_sample?: boolean }).is_sample);
 }
 
 // Terminal statuses that start the retention clock (DATA_RETENTION.md:

@@ -30,6 +30,8 @@ import { GET as stylePrefsGet, PUT as stylePrefsPut, DELETE as stylePrefsDelete 
 import { POST as casesStartPost } from '../app/api/cases/start/route';
 import { GET as healthGet } from '../app/api/health/route';
 import { POST as purgePost } from '../app/api/jobs/purge-expired-uploads/route';
+import { GET as samplesGet, POST as samplesPost } from '../app/api/demo/samples/route';
+import { POST as samplesResetPost } from '../app/api/demo/samples/reset/route';
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = '') {
@@ -406,7 +408,101 @@ for (const r of limited) {
 }
 }
 
+// --- /api/demo/samples (DEMO_DAY stage 1, db/028) ---
+async function demoSamples() {
+  const SID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
+  const demoOn = { isDemoMode: () => true };
+  await expect401('samples GET: unauthenticated -> 401', () => samplesGet(fakeReq({ url: `http://localhost/api/demo/samples?sid=${SID}` })));
+  await expect401('samples POST: unauthenticated -> 401', () => samplesPost(fakeReq({ body: { sid: SID, key: 'maria' } })));
+  await expect401('samples reset POST: unauthenticated -> 401', () => samplesResetPost(fakeReq({ body: { sid: SID } })));
+  {
+    let touched = false;
+    stub({ ...asA, isDemoMode: () => false, openSampleCase: (async () => { touched = true; return { caseId: 'c', sessionId: 's' }; }) as any, resetSampleSession: (async () => { touched = true; return 1; }) as any });
+    const r1 = await samplesGet(fakeReq({ url: `http://localhost/api/demo/samples?sid=${SID}` }));
+    const r2 = await samplesPost(fakeReq({ body: { sid: SID, key: 'maria' } }));
+    const r3 = await samplesResetPost(fakeReq({ body: { sid: SID } }));
+    restore();
+    check('samples: DEMO_MODE off -> 404 on every method, nothing touched', r1.status === 404 && r2.status === 404 && r3.status === 404 && !touched, `${r1.status}/${r2.status}/${r3.status}`);
+  }
+  {
+    let touched = false;
+    stub({ ...asA, ...demoOn, openSampleCase: (async () => { touched = true; return { caseId: 'c', sessionId: 's' }; }) as any });
+    const bad = await samplesPost(fakeReq({ body: { sid: "x' or 1=1", key: 'maria' } }));
+    const unknown = await samplesPost(fakeReq({ body: { sid: SID, key: 'nobody' } }));
+    restore();
+    check('samples POST: bad sample session id or unknown key -> 400, nothing created', bad.status === 400 && unknown.status === 400 && !touched, `${bad.status}/${unknown.status}`);
+  }
+  {
+    let seen: any = null;
+    stub({ ...asA, ...demoOn, openSampleCase: (async (uid: string, sid: string, key: string) => { seen = { uid, sid, key }; return { caseId: 'c1', sessionId: 's1' }; }) as any });
+    const res = await samplesPost(fakeReq({ body: { sid: SID, key: 'james', userId: B } }));
+    restore();
+    check('samples POST: opens for the session user only (body userId ignored)', res.status === 200 && seen?.uid === A && seen?.sid === SID && seen?.key === 'james', JSON.stringify(seen));
+  }
+  {
+    let seen: any = null;
+    stub({ ...asA, ...demoOn, listSampleCases: (async (uid: string, sid: string) => { seen = { uid, sid }; return [{ id: 'c9', sample_key: 'dana', sample_session_id: sid }]; }) as any });
+    const res = await samplesGet(fakeReq({ url: `http://localhost/api/demo/samples?sid=${SID}&userId=${B}` }));
+    const body: any = await res.json();
+    restore();
+    check("samples GET: lists the session user's open copies only", res.status === 200 && seen?.uid === A && body.samples.length === 5 && body.samples.find((s: any) => s.key === 'dana')?.caseId === 'c9', JSON.stringify(seen));
+  }
+  {
+    let seen: any = null;
+    stub({ ...asA, ...demoOn, resetSampleSession: (async (uid: string, sid: string) => { seen = { uid, sid }; return 2; }) as any });
+    const res = await samplesResetPost(fakeReq({ body: { sid: SID, userId: B } }));
+    restore();
+    check("samples reset: resets the session user's tab only (body userId ignored)", res.status === 200 && seen?.uid === A && seen?.sid === SID, JSON.stringify(seen));
+  }
+  {
+    let limiterRoute: string | null = null;
+    stub({ ...asA, ...demoOn, consumeRateLimit: (async (route: string) => { limiterRoute = route; return { allowed: false, unavailable: false, bucket: 'samples:user:burst', retryAfterSeconds: 60 }; }) as any });
+    const res = await samplesPost(fakeReq({ body: { sid: SID, key: 'maria' } }));
+    restore();
+    check('samples POST: rate limited on its own samples budget -> 429', res.status === 429 && limiterRoute === 'samples', `status ${res.status}, route ${limiterRoute}`);
+  }
+  {
+    let limiter = false;
+    let reachedCase = false;
+    stub({
+      ...asA, ...demoOn,
+      consumeRateLimit: (async () => { limiter = true; return { allowed: true as const }; }) as any,
+      canAccessCase: (async () => { reachedCase = true; return true; }) as any,
+    });
+    const res = await documentsPost(fakeReq({ formData: true }), paramsFor('c1'));
+    restore();
+    check('documents POST: DEMO_MODE on -> 403 before anything is read, counted or stored', res.status === 403 && !limiter && !reachedCase, `status ${res.status}`);
+  }
+  {
+    stub({ ...asA, isDemoMode: () => false, canAccessCase: (async () => true) as any });
+    const res = await documentsPost(fakeReq({ formData: true }), paramsFor('c1'));
+    restore();
+    check('documents POST: DEMO_MODE off -> real upload path unchanged (400 = reached file validation)', res.status === 400, `status ${res.status}`);
+  }
+  {
+    let recorded = false;
+    stub({ ...asA, canAccessCase: (async () => true) as any, getCaseSample: (async () => ({ id: 'c1', sample_key: 'maria', sample_session_id: SID })) as any, recordOutcome: (async () => { recorded = true; return {}; }) as any });
+    const res = await outcomesPost(fakeReq({ body: { caseId: 'c1', fields: {} } }));
+    restore();
+    check('outcomes POST: a sample case never records an outcome -> 409', res.status === 409 && !recorded, `status ${res.status}`);
+  }
+  {
+    stub({
+      ...asA,
+      isDemoMode: () => false,
+      getOwnedChatSession: (async (uid: string, sid: string) => ({ id: sid, user_id: uid, case_id: 'c1' })) as any,
+      getChatProfile: (async () => ({})) as any,
+      getCaseSample: (async () => ({ id: 'c1', sample_key: 'maria', sample_session_id: SID })) as any,
+      touchSampleCase: (async () => { throw new Error('should not touch'); }) as any,
+    });
+    const res = await chatPost(fakeReq({ body: { message: 'x', sessionId: 's1' } }));
+    restore();
+    check('chat POST: a sample case with DEMO_MODE off -> 404', res.status === 404, `status ${res.status}`);
+  }
+}
+
 main()
+  .then(() => demoSamples())
   .then(() => {
     console.log(failures === 0 ? '\nAUTH GUARDS: ALL PASS' : `\nAUTH GUARDS: ${failures} FAILURE(S)`);
     process.exit(failures === 0 ? 0 : 1);

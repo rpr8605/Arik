@@ -19,6 +19,7 @@
 
 import { isManufacturerCopayPath, partitionCopayCardsForInsurance } from './medicareEligibility';
 import { resolveLocation } from './resolveLocation';
+import type { SampleSubject } from './demo/samples';
 
 // The only profile fields that may reach the response model.
 export const MODEL_PROFILE_FIELDS = ['preferred_language', 'explanation_style', 'insurance_type', 'state'] as const;
@@ -55,11 +56,30 @@ export interface ChatSubject {
   coverageUnknownManaged: boolean;
 }
 
+// sample (DEMO_DAY stage 1): a sample case is about the fictional person in
+// the fixture (lib/demo/samples.ts), never the visitor. Their insurance,
+// state and income come from the fixture; for a caregiver sample that is
+// the person cared for, whose coverage IS known, so the normal Medicare
+// copay-card block applies.
 export function resolveChatSubject(input: {
   userProfile: Record<string, any> | null;
   managedPatient: ManagedPatientRef | null;
+  sample?: SampleSubject | null;
 }): ChatSubject {
   const reader = input.userProfile;
+  if (input.sample) {
+    return {
+      kind: input.sample.caringFor ? 'managed_patient' : 'self',
+      managedPatientId: null,
+      insuranceType: input.sample.insuranceType,
+      state: input.sample.state,
+      incomePctFpl: input.sample.incomePctFpl,
+      householdSize: input.sample.householdSize,
+      preferredLanguage: reader?.preferred_language ?? null,
+      explanationStyle: reader?.explanation_style ?? null,
+      coverageUnknownManaged: false,
+    };
+  }
   if (!input.managedPatient) {
     return {
       kind: 'self',

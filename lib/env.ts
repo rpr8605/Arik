@@ -27,6 +27,7 @@ export const ENV_VARS: EnvVar[] = [
   { name: 'MODEL_TIMEOUT_MS', scope: 'server', required: false, purpose: 'Model call timeout in ms (default 60000)' },
   { name: 'APP_VERSION', scope: 'server', required: false, purpose: 'Git SHA or release tag reported by /api/health (set automatically from the build commit when unset)' },
   { name: 'RATE_LIMIT_ANON_DAILY_MODEL_CAP', scope: 'server', required: false, purpose: 'Combined daily model-request cap for all anonymous users (default 200)' },
+  { name: 'DEMO_MODE', scope: 'server', required: false, purpose: 'Sample patients picker and /api/demo/* when exactly "true" (Vercel demo only; needs db/028)' },
   { name: 'RATE_LIMIT_IP_SALT', scope: 'server', required: false, purpose: 'Key for hashing client IPs in rate-limit counters (default: derived from the service-role key)' },
 ];
 

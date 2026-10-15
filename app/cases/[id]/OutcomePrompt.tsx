@@ -61,7 +61,7 @@ export function OutcomePrompt({ caseId }: { caseId: string }) {
   if (state === 'done') {
     return (
       <section aria-label="Outcome confirmed" style={{ border: '1px solid', padding: '0.75rem', maxWidth: '40rem' }}>
-        <p>Thanks, outcome confirmed. This is what proves the savings were real.</p>
+        <p>Thanks, your result is saved. This is how Arik shows the savings were real.</p>
       </section>
     );
   }
@@ -69,7 +69,7 @@ export function OutcomePrompt({ caseId }: { caseId: string }) {
   return (
     <section aria-label="Confirm the outcome" style={{ border: '1px solid', padding: '0.75rem', maxWidth: '40rem' }}>
       <p>
-        <strong>Before this case closes out:</strong> did it work? What did you actually pay, and
+        <strong>Before we wrap this up:</strong> did it work? What did you actually pay, and
         where? This is how Arik proves a recommendation actually saved money. Nothing counts
         without your confirmation.
       </p>
@@ -93,7 +93,7 @@ export function OutcomePrompt({ caseId }: { caseId: string }) {
         style={{ width: '12rem' }}
       />{' '}
       <button type="button" onClick={confirm} disabled={state === 'saving'}>
-        {state === 'saving' ? 'Saving…' : 'Confirm outcome'}
+        {state === 'saving' ? 'Saving…' : 'Save my result'}
       </button>{' '}
       <button type="button" onClick={() => setState('dismissed')} disabled={state === 'saving'}>
         Not now

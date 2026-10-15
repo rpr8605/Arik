@@ -17,7 +17,7 @@
 import { createHmac } from 'node:crypto';
 import { supabaseAdmin } from './supabaseAdmin';
 
-export type LimitedRoute = 'chat' | 'documents' | 'cases_start';
+export type LimitedRoute = 'chat' | 'documents' | 'cases_start' | 'samples';
 
 // What a blocked request is told. 'burst' = short per-user window,
 // 'daily' = per-user day, 'ip' = per-IP hour, 'demo_cap' = the combined
@@ -62,6 +62,10 @@ export const ROUTE_LIMITS: Record<LimitedRoute, RouteLimits> = {
   chat: { burst: { windowSeconds: MINUTE, limit: 10 }, daily: { anon: 25, authed: 150 }, ipPerHour: 60, spendsModelCalls: true },
   documents: { burst: { windowSeconds: 10 * MINUTE, limit: 5 }, daily: { anon: 5, authed: 30 }, ipPerHour: 20, spendsModelCalls: true },
   cases_start: { burst: { windowSeconds: HOUR, limit: 10 }, daily: { anon: 20, authed: 100 }, ipPerHour: null, spendsModelCalls: false },
+  // Demo sample patients (DEMO_DAY stage 1): opening a copy or Reset makes
+  // case rows, no model call. Roomier than cases_start so a demo with a few
+  // resets never hits it; chat in a sample still counts against chat.
+  samples: { burst: { windowSeconds: HOUR, limit: 30 }, daily: { anon: 60, authed: 200 }, ipPerHour: null, spendsModelCalls: false },
 };
 
 // RATE_LIMIT_ANON_DAILY_MODEL_CAP overrides the combined cap; anything that

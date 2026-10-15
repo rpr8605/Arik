@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiDeps, notFound, requireUser, unauthorized } from '@/lib/apiAuth';
 import { rateLimitResponse } from '@/lib/rateLimit';
+import { DEMO_UPLOAD_REFUSAL } from '@/lib/demo/sampleDocs';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import {
@@ -31,6 +32,10 @@ export async function POST(
 ) {
   const userId = await requireUser(req);
   if (!userId) return unauthorized();
+  // DEMO_MODE backstop (DEMO_DAY.md, 2026-10-15): the demo only offers
+  // fictional sample documents, so a real upload is refused before anything
+  // is read, rate-counted or stored. Outside DEMO_MODE nothing changes.
+  if (apiDeps.isDemoMode()) return NextResponse.json({ error: DEMO_UPLOAD_REFUSAL }, { status: 403 });
 
   // Rate limits and the demo model budget, before any work (fails closed).
   const limit = await apiDeps.consumeRateLimit('documents', userId, req);

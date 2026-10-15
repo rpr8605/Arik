@@ -2,10 +2,13 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { getCase } from '@/lib/cases';
+import { canAccessCase, getCase } from '@/lib/cases';
+import { isDemoMode, sampleByKey } from '@/lib/demo/samples';
+import { touchSampleCase } from '@/lib/demo/sampleCases';
+import { SamplePanel } from './SamplePanel';
+import { loadCaseCards } from '@/lib/caseCards';
 import { hasConfirmedOutcome, shouldPromptOutcomeConfirmation } from '@/lib/outcomes';
 import { Thread } from './Thread';
-import { DocumentUpload } from './DocumentUpload';
 import { OutcomePrompt } from './OutcomePrompt';
 
 export default async function CasePage({
@@ -34,12 +37,23 @@ export default async function CasePage({
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const kase = await getCase(id);
+  // Same rule as the API (Step 0): a stranger's case and a missing case
+  // look identical. The page used to render any case by id.
+  const kase = (await canAccessCase(user.id, id)) ? await getCase(id) : null;
   if (!kase) return <main><p>Case not found.</p></main>;
+
+  // Demo sample patient (DEMO_DAY stage 1, db/028): the fictional person's
+  // card and past jobs, no uploads and no outcome prompt (samples never
+  // count). With DEMO_MODE off a sample case is treated as missing.
+  const isSample = (kase as { is_sample?: boolean }).is_sample === true;
+  const sample = isSample ? sampleByKey((kase as { sample_key?: string }).sample_key) : null;
+  if (isSample && (!sample || !isDemoMode())) return <main><p>Case not found.</p></main>;
+  if (isSample) await touchSampleCase(id);
 
   // Outcome-confirmation prompt: exactly when terminal + nothing
   // patient-confirmed yet (pure decision in lib/outcomes.ts).
-  const showOutcomePrompt = shouldPromptOutcomeConfirmation(
+  const card = (await loadCaseCards([kase]))[id];
+  const showOutcomePrompt = !isSample && shouldPromptOutcomeConfirmation(
     kase.status,
     await hasConfirmedOutcome(id),
   );
@@ -61,27 +75,27 @@ export default async function CasePage({
 
   return (
     <main>
-      <h1>{kase.case_type.replaceAll('_', ' ')}</h1>
-      <p>
-        Status: <strong>{kase.status.replaceAll('_', ' ')}</strong>
-        {kase.next_action ? `. Next: ${kase.next_action}` : ''}
-      </p>
+      {sample ? <SamplePanel sample={sample} /> : null}
+      <h1 className={sample ? 'case-type-sub' : undefined}>{card.title}</h1>
+      <p>{card.happening}</p>
       {kase.institution_name ? <p>{kase.institution_name}</p> : null}
       {kase.resolved_at ? (
         <p>
-          Resolved. Case data auto-deletes on{' '}
-          {new Date(new Date(kase.resolved_at).getTime() + 90 * 24 * 3600_000).toLocaleDateString()}{' '}
-          (a summary of the outcome is kept).
+          This is finished. Arik deletes the details on{' '}
+          {new Date(new Date(kase.resolved_at).getTime() + 90 * 24 * 3600_000).toLocaleDateString()} and keeps
+          only a short summary of how it turned out.
         </p>
       ) : null}
       {showOutcomePrompt ? <OutcomePrompt caseId={id} /> : null}
-      <DocumentUpload caseId={id} />
       {session ? (
         <Thread
           sessionId={session.id}
           initialMessages={(messages ?? []) as { role: string; content: string }[]}
           firstMessage={first ?? null}
           introShown={from === 'welcome'}
+          suggestedFirst={sample?.starterMessage ?? null}
+          caseId={id}
+          demoMode={isDemoMode()}
         />
       ) : (
         <p>No conversation thread exists for this case yet.</p>

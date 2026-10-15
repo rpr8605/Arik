@@ -3,6 +3,16 @@
 import { useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
+// Document types in plain words (never the internal type name).
+const DOC_WORDS: Record<string, string> = {
+  itemized_bill: 'an itemized bill',
+  eob: 'an explanation of benefits',
+  denial_letter: 'a denial letter',
+  insurance_card: 'an insurance card',
+  spd: 'a plan document',
+  other: 'a document',
+};
+
 // Both intake paths from one entry point (MULTI_FORMAT_UPLOAD.md):
 // "Take a photo" (the cheapest camera path - the OS camera app via the
 // capture attribute; the guided live-quality camera overlay from
@@ -33,14 +43,24 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
         body: form,
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `upload failed (${res.status})`);
+      if (!res.ok) {
+        throw new Error(
+          res.status === 413
+            ? 'That file is too big. The limit is 25MB.'
+            : res.status === 415
+              ? 'Arik can read PDFs and photos. Try one of those.'
+              : (res.status === 429 || res.status === 503) && json.error
+                ? json.error
+                : "Arik couldn't read that file. Try again or try a clearer photo.",
+        );
+      }
       const parts = [
-        `Read as ${json.document.doc_type.replaceAll('_', ' ')}`,
+        `Arik read this as ${DOC_WORDS[json.document.doc_type] ?? 'a document'}`,
         json.extraction?.institution_name ? `from ${json.extraction.institution_name}` : null,
         json.extraction?.total_amount_usd != null
-          ? `patient amount $${json.extraction.total_amount_usd}`
+          ? `showing $${json.extraction.total_amount_usd} for you to pay`
           : null,
-        (json.corrections ?? []).length > 0 ? 'correction pending in the thread above' : null,
+        (json.corrections ?? []).length > 0 ? 'Arik has a question for you in the chat' : null,
       ].filter(Boolean);
       setResult(parts.join('. '));
     } catch (e) {

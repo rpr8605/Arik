@@ -104,10 +104,14 @@ const SUGGESTED: {
 export function NewCaseForm({
   currentPlanType,
   intro,
+  demoMode = false,
   children,
 }: {
   currentPlanType: string | null;
   intro: string;
+  // DEMO_MODE: "Try a sample patient" opens the picker instead of the
+  // coming-soon note.
+  demoMode?: boolean;
   children?: React.ReactNode;
 }) {
   const [text, setText] = useState('');
@@ -168,7 +172,13 @@ export function NewCaseForm({
             className="starter"
             style={{ animationDelay: `${120 + i * 70}ms` }}
             disabled={busy}
-            onClick={() => (s.message ? start(s.message, null) : setSoon(s.id))}
+            onClick={() =>
+              s.id === 'sample' && demoMode
+                ? router.push('/samples')
+                : s.message
+                  ? start(s.message, null)
+                  : setSoon(s.id)
+            }
           >
             <span className="starter-icon">{s.icon}</span>
             <span>{s.label}</span>
@@ -215,7 +225,7 @@ export function NewCaseForm({
           autoComplete="off"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Tell Arik what's going on"
+          placeholder="Ask about a prescription, a bill, or a denial."
         />
         <button type="submit" disabled={busy || !text.trim()}>
           {busy ? 'Starting…' : 'Send'}

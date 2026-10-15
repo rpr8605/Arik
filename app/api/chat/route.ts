@@ -22,6 +22,7 @@ import { rateLimitResponse } from '@/lib/rateLimit';
 import { composeReply } from '@/lib/persona/arik';
 import { detectStyle, introFor, measureLoad, styleBlock } from '@/lib/persona/styleSignals';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
+import { sampleByKey, type SamplePatient } from '@/lib/demo/samples';
 import { COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
 import {
   MANAGED_UNKNOWN_COVERAGE_REASON,
@@ -185,7 +186,10 @@ Schema:
 }
 
 // --- Step 2: query the brain, not the model ---
-async function retrieveContext(userId: string, intent: Intent, profile: any, managedPatientId: string | null) {
+// sample (DEMO_DAY stage 1): a sample case reads the fixture's medicines,
+// never the visitor's own rows, and falls back to the fixture's drug when
+// the message names none.
+async function retrieveContext(userId: string, intent: Intent, profile: any, managedPatientId: string | null, sample: SamplePatient | null = null) {
   // profile arrives pre-fetched: the route needs it before retrieval for
   // language and fact-merge, and maybeSingle makes a missing row (new
   // user, incremental onboarding per CRISIS_AWARE_DESIGN.md) a null, not
@@ -196,9 +200,14 @@ async function retrieveContext(userId: string, intent: Intent, profile: any, man
     .from('user_medications')
     .select('*, drugs(*)')
     .eq('user_id', userId);
-  const { data: medications } = await (managedPatientId
-    ? medQuery.eq('managed_patient_id', managedPatientId)
-    : medQuery.is('managed_patient_id', null));
+  const { data: medications } = sample
+    ? { data: sample.medications.map((m) => ({ dose: m.dose, drugs: { name: m.drug } })) }
+    : await (managedPatientId
+        ? medQuery.eq('managed_patient_id', managedPatientId)
+        : medQuery.is('managed_patient_id', null));
+  if (sample && !intent.drug_name && sample.medications[0]) {
+    intent = { ...intent, drug_name: sample.medications[0].drug };
+  }
 
   let drugQuery = supabase().from('drugs').select('id, name, brand_names');
   if (intent.drug_name) {
@@ -354,8 +363,17 @@ export async function POST(req: Request) {
   // patient for a caregiver case, else the user. Insurance, state and
   // income come from the subject; language and explanation style from the
   // person reading.
-  const managedPatient = session.case_id ? await apiDeps.getCaseManagedPatient(session.case_id) : null;
-  const subject = resolveChatSubject({ userProfile: profile, managedPatient });
+  // A sample case (DEMO_DAY stage 1) is about the fictional person in the
+  // fixture: their situation drives retrieval and the copay-card block,
+  // nothing is merged into the visitor's own profile, and each turn
+  // restarts the 60-minute idle clock. With DEMO_MODE off a sample case
+  // is treated as missing.
+  const sampleCase = session.case_id ? await apiDeps.getCaseSample(session.case_id) : null;
+  const sample = sampleCase ? sampleByKey(sampleCase.sample_key) : null;
+  if (sampleCase && (!sample || !apiDeps.isDemoMode())) return Response.json({ error: 'unknown session' }, { status: 404 });
+  if (sampleCase) await apiDeps.touchSampleCase(sampleCase.id);
+  const managedPatient = session.case_id && !sample ? await apiDeps.getCaseManagedPatient(session.case_id) : null;
+  const subject = resolveChatSubject({ userProfile: profile, managedPatient, sample: sample?.subject ?? null });
 
   // Persona (2026-10-14, docs/kimi/ARIK_PERSONA.md). History is read up
   // front: the intro needs to know whether Arik has replied in this case
@@ -428,15 +446,17 @@ export async function POST(req: Request) {
   // Merge BEFORE retrieval: every extracted fact becomes durable this
   // turn, even when the answer short-circuits below. Contradictions come
   // back as pending one-tap corrections for the Thread UI.
-  const corrections = await mergeExtractedFacts(
-    supabase(),
-    userId,
-    session.case_id ?? null,
-    intent,
-    { managedPatientId: subject.managedPatientId },
-  );
+  const corrections = sample
+    ? []
+    : await mergeExtractedFacts(
+        supabase(),
+        userId,
+        session.case_id ?? null,
+        intent,
+        { managedPatientId: subject.managedPatientId },
+      );
 
-  const context = await retrieveContext(userId, intent, profile, subject.managedPatientId);
+  const context = await retrieveContext(userId, intent, profile, subject.managedPatientId, sample);
 
   // AKS hard-block (lib/medicareEligibility.ts): manufacturer copay cards
   // are federally illegal for Medicare/Medicaid patients. They leave the

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { fieldLabel } from '@/lib/caseCard';
+import { AttachSheet } from './AttachSheet';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { Markdown } from '@/app/Markdown';
@@ -28,15 +30,6 @@ function STYLE_WORDS(offer: { length?: string; order?: string }): string {
   return parts.join(' and ') || 'this';
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  employer_name: 'employer',
-  institution_name: 'hospital or clinic',
-  insurance_plan_name: 'insurance plan',
-  prescriber_name: 'prescriber',
-  state_or_location_raw: 'location',
-  zip_code: 'ZIP code',
-  state: 'state',
-};
 
 // Assistant message with the guided-advocate structure (2026-08-12):
 // the model writes the main answer, then a ---DETAILS--- marker, then the
@@ -84,7 +77,7 @@ function AssistantMessage({
         <div
           key={c.id}
           role="group"
-          aria-label="Confirm a correction"
+          aria-label="Check a detail"
           style={{ border: '1px solid', padding: '0.5rem', marginTop: '0.5rem', maxWidth: '40rem' }}
         >
           {resolved[c.id] ? (
@@ -93,7 +86,7 @@ function AssistantMessage({
             <>
               <p>
                 You mentioned <strong>{c.new_value}</strong> as your{' '}
-                {FIELD_LABELS[c.field] ?? c.field}, but I have{' '}
+                {fieldLabel(c.field)}, but I have{' '}
                 <strong>{c.old_value ?? 'nothing'}</strong> on file. Update it?
               </p>
               <button type="button" onClick={() => onResolveCorrection(c.id, 'confirm')}>
@@ -133,13 +126,24 @@ export function Thread({
   initialMessages,
   firstMessage,
   introShown = false,
+  suggestedFirst = null,
+  caseId,
+  demoMode = false,
 }: {
   sessionId: string;
   initialMessages: Message[];
   firstMessage: string | null;
   // The welcome screen already showed Arik's intro; the first reply skips it.
   introShown?: boolean;
+  // A one-tap first question (sample patients). Never sent automatically:
+  // a model call only happens when the visitor taps it.
+  suggestedFirst?: string | null;
+  // For the "+" sheet: the real upload targets this case; in DEMO_MODE the
+  // sheet shows sample documents only.
+  caseId: string;
+  demoMode?: boolean;
 }) {
+  const [attachOpen, setAttachOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -202,7 +206,15 @@ export function Thread({
         body: JSON.stringify({ message: text, sessionId, introShown: opts.introShown === true }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
+      // Rate-limit answers (429/503) are already written for people; any
+      // other failure gets one plain sentence instead of a server message.
+      if (!res.ok) {
+        throw new Error(
+          (res.status === 429 || res.status === 503) && json.error
+            ? json.error
+            : 'Something went wrong. Try sending that again.',
+        );
+      }
       setProgramPhone(json.program_phone ?? null);
       setStyleOffer(json.style_suggestion ?? null);
       setLangOffer(json.language_suggestion === 'es' ? 'es' : null);
@@ -237,7 +249,7 @@ export function Thread({
     try {
       const res = await authedFetch('/api/preferences/style', { method: 'PUT', body: JSON.stringify(styleOffer) });
       if (!res.ok) throw new Error();
-      setOfferNote('Saved. You can change or delete it on the home screen.');
+      setOfferNote('Saved. You can change or delete it in Settings (the gear at the top).');
     } catch {
       setOfferNote("Couldn't save that right now.");
     }
@@ -272,7 +284,7 @@ export function Thread({
       if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
       setResolved((r) => ({
         ...r,
-        [id]: action === 'confirm' ? `Updated to "${json.value}".` : 'Kept the existing value.',
+        [id]: action === 'confirm' ? `Updated to "${json.value}".` : 'Kept what Arik had before.',
       }));
     } catch (e) {
       setError((e as Error).message);
@@ -288,11 +300,24 @@ export function Thread({
   }, [firstMessage]);
 
   return (
-    <section aria-label="Case conversation">
+    <section aria-label="Conversation with Arik">
+      {suggestedFirst && messages.length === 0 && !busy ? (
+        <div className="suggested-first">
+          <p>Start with:</p>
+          <button type="button" onClick={() => send(suggestedFirst)}>
+            {suggestedFirst}
+          </button>
+        </div>
+      ) : null}
       <div aria-live="polite">
         {messages.map((m, i) => (
-          <div key={i} style={{ marginBottom: '1rem' }}>
-            <strong>{m.role === 'user' ? 'You' : 'Arik'}:</strong>
+          <div key={i} className={m.role === 'user' ? 'msg msg-user' : 'msg msg-arik'}>
+            {m.role === 'assistant' ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="msg-avatar" src="/brand/arik-mark-h84.webp" alt="" width={28} height={28} />
+            ) : null}
+            <span className="sr-only">{m.role === 'user' ? 'You said:' : 'Arik said:'}</span>
+            <div className="bubble-body">
             {m.role === 'assistant' ? (
               <AssistantMessage
                 content={m.content}
@@ -309,6 +334,7 @@ export function Thread({
             ) : (
               <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
             )}
+            </div>
           </div>
         ))}
         {busy && <p>Arik is working…</p>}
@@ -372,15 +398,13 @@ export function Thread({
         </button>
         <button
           type="button"
-          aria-disabled="true"
-          aria-label="Document or photo upload: coming soon"
-          title="Document or photo upload: coming soon"
-          onClick={() => setComingSoon('Document or photo upload: coming soon')}
-          className="icon-btn"
-          style={{ opacity: 0.5, cursor: 'default' }}
+          aria-label={demoMode ? 'Add a sample document' : 'Add a document or photo'}
+          aria-haspopup="dialog"
+          onClick={() => setAttachOpen(true)}
+          className="icon-btn plus-btn"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
         <input
@@ -398,6 +422,7 @@ export function Thread({
       </form>
       {comingSoon ? <p style={{ fontSize: '0.9em', margin: '0.25rem 0 0' }}>{comingSoon}</p> : null}
       {error && <p role="alert">{error}</p>}
+      {attachOpen ? <AttachSheet caseId={caseId} demoMode={demoMode} onClose={() => setAttachOpen(false)} /> : null}
     </section>
   );
 }

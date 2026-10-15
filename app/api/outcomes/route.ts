@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
     }
     if (!body.caseId) return NextResponse.json({ error: 'caseId is required' }, { status: 400 });
     if (!(await apiDeps.canAccessCase(userId, body.caseId))) return notFound();
+    // Sample patients (db/028) never count toward outcomes or savings.
+    if (await apiDeps.getCaseSample(body.caseId)) {
+      return NextResponse.json({ error: 'Sample cases do not record outcomes.' }, { status: 409 });
+    }
     const outcome = await apiDeps.recordOutcome(body.caseId, body.fields ?? {});
     return NextResponse.json({ outcome }, { status: 201 });
   } catch (e) {

@@ -735,20 +735,6 @@ button.starter:hover:not(:disabled) {
   color: var(--arik-muted);
   font-size: 16px;
 }
-details.settings {
-  margin: 1.5rem 0 1rem;
-}
-details.settings summary {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  color: var(--arik-muted);
-  font-weight: 600;
-}
-details.settings section[aria-label] {
-  margin-top: 0.75rem;
-}
 .home-composer {
   margin-top: auto;
 }
@@ -775,4 +761,408 @@ details.settings section[aria-label] {
   .demo-ticker-static {
     display: inline;
   }
+}
+
+/* ---- Sample patients (DEMO_DAY.md stage 1) ---- */
+.lede {
+  color: var(--arik-muted);
+  margin: 0 0 1.25rem;
+}
+.tag {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--arik-navy-tint);
+  color: var(--arik-navy);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tag-sample {
+  background: var(--arik-brand-tint);
+  color: var(--arik-brand-darker);
+  margin: 0 0 0.5rem;
+}
+.sample-list {
+  display: grid;
+  gap: 0.75rem;
+}
+button.sample-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.4rem 0.9rem;
+  width: 100%;
+  min-height: 88px;
+  padding: 0.9rem 1rem;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid var(--arik-border);
+  background: #fff;
+  color: var(--arik-ink);
+  font-size: 17px;
+  font-weight: 400;
+  box-shadow: var(--arik-shadow);
+  animation: rise 0.45s ease both;
+}
+button.sample-card:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--arik-teal);
+}
+button.sample-card .tag {
+  grid-column: 2;
+  justify-self: start;
+}
+.sample-avatar {
+  grid-row: span 2;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--arik-brand-tint);
+  color: var(--arik-brand-darker);
+  font-family: var(--font-outfit), var(--font-source-sans), sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+}
+.sample-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.sample-text strong {
+  font-family: var(--font-outfit), var(--font-source-sans), sans-serif;
+  font-size: 19px;
+}
+.sample-text span {
+  color: var(--arik-muted);
+  font-size: 16px;
+}
+.sample-text .sample-shows {
+  color: var(--arik-brand-dark);
+  font-size: 15px;
+}
+.sample-reset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 1.25rem;
+  color: var(--arik-muted);
+  font-size: 16px;
+}
+.sample-panel {
+  margin-bottom: 1.25rem;
+}
+.sample-panel h1 {
+  margin-bottom: 0.5rem;
+}
+.sample-facts {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+}
+.job-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.job-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  background: var(--arik-navy-tint);
+}
+.job-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.job-date {
+  color: var(--arik-muted);
+  font-size: 15px;
+}
+.job-outcome {
+  font-size: 16px;
+}
+.chip {
+  flex: none;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip-done {
+  background: var(--arik-brand-tint);
+  color: var(--arik-brand-darker);
+}
+.chip-in_progress {
+  background: rgba(126, 198, 244, 0.25);
+  color: var(--arik-navy);
+}
+.chip-waiting {
+  background: rgba(179, 54, 47, 0.1);
+  color: #8f2a24;
+}
+h1.case-type-sub {
+  font-size: 18px;
+  color: var(--arik-muted);
+}
+.suggested-first {
+  margin-bottom: 1rem;
+}
+.suggested-first p {
+  margin: 0 0 0.4rem;
+  color: var(--arik-muted);
+  font-size: 16px;
+}
+.suggested-first button[type="button"] {
+  text-align: left;
+  border-radius: 16px;
+  line-height: 1.35;
+  padding: 0.7rem 1rem;
+}
+
+/* ---- Home copy, settings gear, chat bubbles, "+" sheet (2026-10-15) ---- */
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+a.gear {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--arik-navy);
+}
+a.gear:hover {
+  background: var(--arik-navy-tint);
+  text-decoration: none;
+}
+.case-list a.needs-you {
+  border-color: var(--arik-coral);
+  box-shadow: inset 4px 0 0 var(--arik-coral);
+}
+.case-list a.needs-you strong {
+  color: #8f2a24;
+}
+.case-list .case-tap {
+  color: var(--arik-brand-dark);
+  font-size: 15px;
+}
+
+/* Chat bubbles: the patient on the right, Arik on the left with the A. */
+.msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem;
+}
+.msg-user {
+  justify-content: flex-end;
+}
+.msg .bubble-body {
+  max-width: 85%;
+  padding: 0.7rem 0.95rem;
+  border-radius: 20px;
+  min-width: 0;
+}
+.msg-user .bubble-body {
+  background: var(--arik-brand-dark);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+}
+.msg-arik .bubble-body {
+  background: #fff;
+  border: 1px solid var(--arik-border);
+  border-bottom-left-radius: 6px;
+  box-shadow: var(--arik-shadow);
+}
+.msg-avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  margin-bottom: 2px;
+}
+section[aria-label="Conversation with Arik"] {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* "+" next to the reply box: always visible, also on phones. */
+.composer .icon-btn.plus-btn {
+  display: inline-grid;
+  border-radius: 50%;
+  background: var(--arik-brand-tint);
+  color: var(--arik-brand-darker);
+  border: none;
+}
+
+/* Bottom sheet, styled like a phone photo library. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(22, 38, 58, 0.45);
+  display: flex;
+  align-items: flex-end;
+  animation: fade-in 0.2s ease both;
+}
+.sheet {
+  width: 100%;
+  max-height: 85%;
+  overflow-y: auto;
+  background: var(--arik-card);
+  border-radius: 22px 22px 0 0;
+  padding: 0.5rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+  animation: sheet-up 0.25s ease both;
+}
+.sheet-grip {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--arik-border-strong);
+  margin: 0.25rem auto 0.75rem;
+}
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sheet-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.sheet section[aria-label] {
+  box-shadow: none;
+  border: none;
+  padding: 0.75rem 0 0;
+}
+.sheet-note {
+  color: var(--arik-muted);
+  font-size: 14px;
+  margin: 1rem 0 0;
+}
+button.camera-row {
+  width: 100%;
+  margin: 0.9rem 0;
+  border-radius: 14px;
+}
+.doc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+button.doc-thumb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--arik-ink);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+button.doc-thumb img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--arik-border);
+}
+button.doc-thumb .tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+}
+.fake-camera .viewfinder {
+  position: relative;
+  margin: 0.75rem 0;
+  aspect-ratio: 3 / 4;
+  max-height: 50vh;
+  border-radius: 16px;
+  background: #16263a;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  text-align: center;
+  padding: 1rem;
+}
+.fake-camera .viewfinder img {
+  width: 80%;
+  transform: rotate(-2deg);
+}
+.viewfinder-frame {
+  position: absolute;
+  inset: 12%;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 12px;
+}
+button.shutter {
+  display: block;
+  margin: 0 auto;
+  width: 72px;
+  height: 72px;
+  min-height: 72px;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid var(--arik-brand-dark);
+}
+.scan {
+  text-align: center;
+  padding: 1rem 0;
+}
+.scan-doc {
+  position: relative;
+  width: 60%;
+  aspect-ratio: 3 / 4;
+  margin: 0 auto 0.75rem;
+  border-radius: 10px;
+  background: var(--arik-navy-tint);
+  overflow: hidden;
+}
+.scan-doc img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--arik-teal);
+  box-shadow: 0 0 12px var(--arik-teal);
+  animation: scan 1.4s ease-in-out infinite;
+}
+@keyframes scan {
+  0% { top: 0; }
+  50% { top: calc(100% - 3px); }
+  100% { top: 0; }
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

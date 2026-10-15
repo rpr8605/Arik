@@ -6,10 +6,9 @@ import { useState } from 'react';
 // the very top. Tap or hover pauses it; with reduced motion it is static,
 // wrapping text. Screen readers get the sentence once, not the loop.
 export const DEMO_NOTICE =
-  // Owner wording 2026-10-15. When DEMO_DAY stage 1 makes the sample reset
-  // real, switch to: "Demo, sample data only. Sample patients reset when
-  // you close the tab."
-  'Demo, sample data only. Your session is temporary and may be deleted at any time.';
+  // Owner wording 2026-10-15, switched in DEMO_DAY stage 1 when the sample
+  // reset became real (sessionStorage id + 60-minute idle purge, db/028).
+  'Demo, sample data only. Sample patients reset when you close the tab.';
 
 export function DemoTicker() {
   const [paused, setPaused] = useState(false);

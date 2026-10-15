@@ -79,8 +79,8 @@ export function ExplanationPreference({ current }: { current: string | null }) {
   }
 
   return (
-    <section aria-label="How should Arik explain things" style={{ marginBottom: '1rem' }}>
-      <strong>How should Arik explain things?</strong>{' '}
+    <section aria-label="How Arik talks to me" style={{ marginBottom: '1rem' }}>
+      <strong>How Arik talks to me</strong>{' '}
       {OPTIONS.map((o) => (
         <label key={o.value} style={{ marginRight: '0.75rem' }}>
           <input
