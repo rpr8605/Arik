@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { Markdown } from '@/app/Markdown';
 
 interface Correction {
   id: string;
@@ -56,14 +57,16 @@ function AssistantMessage({
 
   return (
     <div>
-      <div style={{ whiteSpace: 'pre-wrap' }}>{main}</div>
+      <Markdown>{main}</Markdown>
       {details ? (
         <div style={{ marginTop: '0.35rem' }}>
           <button type="button" onClick={() => setShowDetails((s) => !s)}>
             {showDetails ? 'Hide details' : 'Show details'}
           </button>
           {showDetails ? (
-            <div style={{ whiteSpace: 'pre-wrap', marginTop: '0.35rem', fontSize: '0.92em' }}>{details}</div>
+            <div style={{ marginTop: '0.35rem', fontSize: '0.92em' }}>
+              <Markdown>{details}</Markdown>
+            </div>
           ) : null}
         </div>
       ) : null}
