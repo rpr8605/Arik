@@ -75,6 +75,12 @@ legal/consent, not labor.
 
 ## Conversational style
 
+> Arik's persona, voice, intro, crisis replies and adaptive style now have
+> one source of truth in code: `lib/persona/arik.ts` and
+> `lib/persona/styleSignals.ts`. Developer notes: the ARIK_PERSONA page in docs/
+> (2026-10-14). The notes below remain the behavioral intent; where they
+> differ on voice or tone, the persona module wins.
+
 - Direct, a little aggressive on the patient's behalf, zero corporate
   hedging language
 - Never a bulleted "here are your options" when one answer is clearly best

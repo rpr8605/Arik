@@ -26,6 +26,7 @@ import { POST as documentsPost } from '../app/api/cases/[id]/documents/route';
 import { POST as correctionsPost } from '../app/api/corrections/route';
 import { GET as preferencesGet, PUT as preferencesPut } from '../app/api/preferences/route';
 import { PUT as insuranceTypePut } from '../app/api/profile/insurance-type/route';
+import { GET as stylePrefsGet, PUT as stylePrefsPut, DELETE as stylePrefsDelete } from '../app/api/preferences/style/route';
 import { POST as casesStartPost } from '../app/api/cases/start/route';
 import { GET as healthGet } from '../app/api/health/route';
 import { POST as purgePost } from '../app/api/jobs/purge-expired-uploads/route';
@@ -319,6 +320,38 @@ await expect401('cases/start POST: unauthenticated -> 401', () => casesStartPost
 {
   const res = await purgePost(fakeReq());
   check('purge job POST: service-key bearer only, no header -> 401', res.status === 401, `status ${res.status}`);
+}
+
+// --- /api/preferences/style (persona, db/027) ---
+await expect401('style prefs GET: unauthenticated -> 401', () => stylePrefsGet(fakeReq()));
+await expect401('style prefs PUT: unauthenticated -> 401', () => stylePrefsPut(fakeReq({ body: { length: 'short' } })));
+await expect401('style prefs DELETE: unauthenticated -> 401', () => stylePrefsDelete(fakeReq()));
+{
+  let saved: { uid: string; prefs: any } | null = null;
+  stub({ ...asA, saveStylePrefs: (async (uid: string, prefs: any) => { saved = { uid, prefs }; return prefs; }) as any });
+  const res = await stylePrefsPut(fakeReq({ body: { length: 'short', order: 'answer_first' } }));
+  restore();
+  const sv = saved as { uid: string; prefs: any } | null;
+  check('style prefs PUT: saves for the session user only', res.status === 200 && sv?.uid === A && sv?.prefs.length === 'short' && sv?.prefs.order === 'answer_first', JSON.stringify(sv));
+}
+for (const [label, body] of [
+  ['an unknown field (userId)', { length: 'short', userId: B }],
+  ['an inferred trait', { mood: 'anxious' }],
+  ['a bad value', { length: 'tiny' }],
+  ['nothing', {}],
+] as [string, any][]) {
+  let called = false;
+  stub({ ...asA, saveStylePrefs: (async () => { called = true; return {}; }) as any });
+  const res = await stylePrefsPut(fakeReq({ body }));
+  restore();
+  check(`style prefs PUT: rejects ${label} with 400, nothing saved`, res.status === 400 && !called, `status ${res.status}`);
+}
+{
+  let deletedFor: string | null = null;
+  stub({ ...asA, deleteStylePrefs: (async (uid: string) => { deletedFor = uid; }) as any });
+  const res = await stylePrefsDelete(fakeReq({ url: `http://localhost/api/preferences/style?userId=${B}` }));
+  restore();
+  check('style prefs DELETE: deletes the session user only (?userId ignored)', res.status === 200 && deletedFor === A, `deleted ${deletedFor}`);
 }
 
 // --- Rate limits (db/026, lib/rateLimit.ts): order is 401 -> 429/503 ->

@@ -30,7 +30,11 @@ check('extraction prompt: crisis/distress is ALWAYS on_topic',
 
 // 3. The off-topic redirect is reachable only when on_topic === false.
 check('off-topic redirect gated behind !intent.on_topic',
-  /if \(!intent\.on_topic\)/.test(routeSrc));
+  /if \(!intent\.on_topic( && !style\.crisis)?\)/.test(routeSrc));
+// 3b. Persona (2026-10-14): crisis language detected in code is never
+// redirected, whatever the extractor said.
+check('off-topic redirect also skipped when code detects crisis',
+  /if \(!intent\.on_topic && !style\.crisis\)/.test(routeSrc));
 
 // 4. The redirect string itself contains no crisis language (it must never
 // be the answer to distress; 2+3 make that unreachable).

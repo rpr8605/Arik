@@ -38,7 +38,8 @@ import {
   listManagedPatients,
   ownsManagedPatient,
 } from './caregivers';
-import { getCaseManagedPatient, getChatProfile, getOwnedChatSession } from './chatSession';
+import { getCaseManagedPatient, getChatProfile, getOwnedChatSession, userHasEarlierConversation } from './chatSession';
+import { deleteStylePrefs, getStylePrefs, saveStylePrefs } from './stylePrefs';
 import { getPendingCorrection } from './extractedFacts';
 import { supabaseAdmin } from './supabaseAdmin';
 import { consumeRateLimit } from './rateLimit';
@@ -67,6 +68,11 @@ export const apiDeps = {
   getOwnedChatSession,
   getChatProfile,
   getCaseManagedPatient,
+  userHasEarlierConversation,
+  // Saved style preferences (persona, db/027).
+  getStylePrefs,
+  saveStylePrefs,
+  deleteStylePrefs,
   // The corrections route's single-row read; the service client is passed
   // by the default wrapper so tests stub one plain function.
   getPendingCorrection: (id: string) => getPendingCorrection(supabaseAdmin(), id),

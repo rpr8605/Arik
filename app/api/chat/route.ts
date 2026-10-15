@@ -19,6 +19,8 @@ import { buildAllowedFacts, withGroundingGuard } from '@/lib/groundingGuard';
 import { buildFallbackOptions, buildTrustReceipt } from '@/lib/trustReceipt';
 import { apiDeps, requireUser } from '@/lib/apiAuth';
 import { rateLimitResponse } from '@/lib/rateLimit';
+import { composeReply } from '@/lib/persona/arik';
+import { detectStyle, introFor, measureLoad, styleBlock } from '@/lib/persona/styleSignals';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import { COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
 import {
@@ -30,8 +32,7 @@ import {
   subjectModelProfile,
 } from '@/lib/chatSubject';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
-import { buildPromptRetrievedContext } from '@/lib/chatRetrieval';
-import type { PriceSourceConsent } from '@/lib/pricing/enforcement';
+import { buildResponsePrompt, retrievedContextFor } from '@/lib/chatPrompt';
 
 // Created lazily per call - a module-level client crashes Next's
 // build-time page-data collection when env vars aren't present.
@@ -47,7 +48,6 @@ function supabase() {
 // cautions that non-English extraction quality is unvalidated - this is a
 // launch-scope decision, not a technical limitation. Any other code falls
 // back to English until extraction quality is validated for it.
-const LANGUAGE_NAMES: Record<string, string> = { en: 'English', es: 'Spanish' };
 function responseLanguage(profile: any): 'en' | 'es' {
   return profile?.preferred_language === 'es' ? 'es' : 'en';
 }
@@ -238,42 +238,21 @@ async function retrieveContext(userId: string, intent: Intent, profile: any, man
 }
 
 // --- Step 3: grounded response, only speaks from retrieved context ---
-export async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard', onUsage?: (u: ModelUsage) => void, retryNote?: string) {
-  const systemPrompt = await loadSystemPrompt();
-
-  // db/022 consent gates are applied inside the builder (lib/chatRetrieval.ts):
-  // stale / display-barred / AI-barred price rows NEVER reach the model.
-  const sourcesById: Record<string, PriceSourceConsent> = {};
-  for (const s of context.priceSources ?? []) sourcesById[s.id] = s;
-  const { payload: retrievedContext } = buildPromptRetrievedContext({
-    exploits: context.exploits ?? [],
-    prices: context.prices ?? [],
-    accumulators: context.accumulators ?? [],
-    counterGuidance: context.counterGuidance ?? [],
-    blockedCards: context.blockedCards ?? [],
-    blockReason: COPAY_CARD_BLOCK_REASON,
-    rankedPathways: context.rankedPathways ?? null,
-    priceSources: sourcesById,
+export async function generateResponse(userMessage: string, context: any, history: any[], lang: 'en' | 'es', format: 'card' | 'standard', onUsage?: (u: ModelUsage) => void, retryNote?: string, styleBlock = '') {
+  // One pure builder (lib/chatPrompt.ts): persona + system prompt (cached),
+  // grounded input with the db/022 consent gates applied inside
+  // lib/chatRetrieval.ts, and the per-person style block last (uncached).
+  const { system, prompt } = buildResponsePrompt({
+    systemPromptFile: await loadSystemPrompt(),
+    userMessage,
+    context,
+    history,
+    lang,
+    format,
+    styleBlock,
+    retryNote,
   });
-
-  const groundedInput = `
-USER_PROFILE: ${JSON.stringify(modelProfile(context.profile))}
-USER_MEDICATIONS: ${JSON.stringify(modelMedications(context.medications))}
-RETRIEVED_CONTEXT: ${JSON.stringify(retrievedContext)}
-CONVERSATION_HISTORY: ${JSON.stringify(history)}
-USER_MESSAGE: ${userMessage}
-${retryNote ? `REGENERATION NOTE (the previous answer was rejected by the grounding check): ${retryNote}\n` : ''}RESPONSE_FORMAT: ${format} ('card' = guided advocate format per the system
-prompt: one-line answer, numbered action steps, boundary line, then the
----DETAILS--- marker. 'standard' = existing structure with the same
-boundary line and marker.)
-RESPONSE_LANGUAGE: ${LANGUAGE_NAMES[lang]} (${lang}). Write the entire
-response in this language. Exception - citations: quote every source
-verbatim in its original language, never translated. Translating a
-verbatim citation breaks the grounding guarantee; this is a correctness
-rule, not a style preference.
-`;
-
-  return callModel({ tier: 'response', system: systemPrompt, prompt: groundedInput, onUsage });
+  return callModel({ tier: 'response', system, prompt, onUsage });
 }
 
 // Grounded response path (S1 hardening, 2026-10-05): the model writes
@@ -301,21 +280,11 @@ export async function generateGroundedResponse(opts: {
   blockedNote: string;
   ranking: any;
   onUsage?: (u: ModelUsage) => void;
+  styleBlock?: string;
 }): Promise<{ text: string; guardTrips: number; regenerated: boolean; fellBack: boolean }> {
-  // Rebuild the prompt payload with the same pure builder and inputs, so
-  // the guard checks against exactly what the model saw.
-  const sourcesById: Record<string, PriceSourceConsent> = {};
-  for (const s of opts.context.priceSources ?? []) sourcesById[s.id] = s;
-  const { payload: retrievedContext } = buildPromptRetrievedContext({
-    exploits: opts.context.exploits ?? [],
-    prices: opts.context.prices ?? [],
-    accumulators: opts.context.accumulators ?? [],
-    counterGuidance: opts.context.counterGuidance ?? [],
-    blockedCards: opts.context.blockedCards ?? [],
-    blockReason: COPAY_CARD_BLOCK_REASON,
-    rankedPathways: opts.context.rankedPathways ?? null,
-    priceSources: sourcesById,
-  });
+  // The same pure builder the prompt uses, so the guard checks against
+  // exactly what the model saw.
+  const retrievedContext = retrievedContextFor(opts.context);
   const facts = buildAllowedFacts({
     retrievedContext,
     profile: modelProfile(opts.context.profile),
@@ -324,7 +293,7 @@ export async function generateGroundedResponse(opts: {
   });
   const guarded = await withGroundingGuard({
     generate: (retryNote) =>
-      generateResponse(opts.message, opts.context, opts.history, opts.lang, opts.format, opts.onUsage, retryNote),
+      generateResponse(opts.message, opts.context, opts.history, opts.lang, opts.format, opts.onUsage, retryNote, opts.styleBlock ?? ''),
     facts,
     fallback: () => buildFallbackOptions({ ranking: opts.ranking, lang: opts.lang }),
     log: (line) => console.log(line),
@@ -386,17 +355,55 @@ export async function POST(req: Request) {
   const managedPatient = session.case_id ? await apiDeps.getCaseManagedPatient(session.case_id) : null;
   const subject = resolveChatSubject({ userProfile: profile, managedPatient });
 
+  // Persona (2026-10-14, docs/kimi/ARIK_PERSONA.md). History is read up
+  // front: the intro needs to know whether Arik has replied in this case
+  // yet, and the style dials read only what this person wrote here.
+  const { data: history } = await supabase()
+    .from('chat_messages')
+    .select('role, content')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true });
+  const priorUserMessages = (history ?? []).filter((m: any) => m.role === 'user').map((m: any) => String(m.content ?? ''));
+  const assistantMessagesInCase = (history ?? []).filter((m: any) => m.role === 'assistant').length;
+  const savedStyle = await apiDeps.getStylePrefs(userId);
+  // Deterministic crisis detection and style dials: code only, no model
+  // call. Crisis freezes the dials at neutral and its code-written reply
+  // comes before anything the model writes.
+  const style = detectStyle([...priorUserMessages, String(message ?? '')], {
+    length: savedStyle.length ?? null,
+    order: savedStyle.order ?? null,
+    simple: profile?.explanation_style === 'simple',
+  });
+  const intro = introFor({
+    assistantMessagesInCase,
+    userHasEarlierConversation: assistantMessagesInCase === 0 ? await apiDeps.userHasEarlierConversation(userId, sessionId) : true,
+    crisis: style.crisis,
+  });
+  const compose = (body: string, shortCircuit: boolean) =>
+    composeReply({ body, crisis: style.crisis, intro, lang, shortCircuit });
+  // One-tap offers for the Thread UI: remember a style the person just
+  // asked for (only if it differs from what's saved), or switch to
+  // Spanish through the existing ledgered language preference.
+  const ask = style.explicitThisTurn;
+  const styleSuggestion =
+    !style.crisis &&
+    ((ask.length && ask.length !== savedStyle.length) || (ask.order && ask.order !== savedStyle.order))
+      ? { length: ask.length, order: ask.order }
+      : null;
+  const languageSuggestion = lang === 'en' && (style.spanishRequested || style.looksSpanish) ? 'es' : null;
+  const persona = { style_suggestion: styleSuggestion, language_suggestion: languageSuggestion };
+
   const intent = await extractIntent(message);
 
   // Extraction produced nothing usable -> ask for the one missing thing,
   // deterministically, without spending a response-model call.
   if (!intent) {
-    const response = STRINGS.clarify[lang];
+    const response = compose(STRINGS.clarify[lang], true);
     await supabase().from('chat_messages').insert([
       { session_id: sessionId, role: 'user', content: message },
       { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: [] },
     ]);
-    return Response.json({ response, sources: [], corrections: [] });
+    return Response.json({ response, sources: [], corrections: [], ...persona });
   }
 
   // Topic-scope boundary (2026-08-13 ticket): clearly off-topic messages
@@ -405,16 +412,16 @@ export async function POST(req: Request) {
   // Crisis and distress language is classified on_topic by the extraction
   // prompt, so it still flows to the full pipeline and the crisis-aware
   // system prompt. Prompt-extraction attempts get this same calm redirect
-  // - brief by design, revealing nothing about the system.
-  if (!intent.on_topic) {
-    const response = STRINGS.offTopic[lang];
+  // - brief by design, revealing nothing about the system. Crisis language
+  // detected in code is never redirected, whatever the extractor said.
+  if (!intent.on_topic && !style.crisis) {
+    const response = compose(STRINGS.offTopic[lang], true);
     await supabase().from('chat_messages').insert([
       { session_id: sessionId, role: 'user', content: message },
       { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: [] },
     ]);
-    return Response.json({ response, sources: [], corrections: [] });
+    return Response.json({ response, sources: [], corrections: [], ...persona });
   }
-
   // Merge BEFORE retrieval: every extracted fact becomes durable this
   // turn, even when the answer short-circuits below. Contradictions come
   // back as pending one-tap corrections for the Thread UI.
@@ -484,19 +491,13 @@ export async function POST(req: Request) {
   const nothingDrugSpecific =
     viable.length === 0 && (context.prices ?? []).length === 0;
   if (nothingDrugSpecific) {
-    const response = STRINGS.noData[lang](intent.drug_name) + blockedNote;
+    const response = compose(STRINGS.noData[lang](intent.drug_name) + blockedNote, true);
     await supabase().from('chat_messages').insert([
       { session_id: sessionId, role: 'user', content: message },
       { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: [] },
     ]);
-    return Response.json({ response, sources: [], corrections });
+    return Response.json({ response, sources: [], corrections, ...persona });
   }
-
-  const { data: history } = await supabase()
-    .from('chat_messages')
-    .select('role, content')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: true });
 
   // Guided-advocate ticket (2026-08-12): the card format is the default
   // when the patient opted into 'simple', and always for the Eliquis
@@ -514,8 +515,13 @@ export async function POST(req: Request) {
     format: useCardFormat ? 'card' : 'standard',
     blockedNote,
     ranking,
+    styleBlock: styleBlock(style),
   });
-  const response = guarded.text;
+  // Cognitive-load watchdog (persona section 2): enforced by the prompt,
+  // measured here for free. Counts only, never content or dials.
+  const load = measureLoad(guarded.text);
+  console.log(`[persona] load numbers=${load.numbers} bullets=${load.bullets} actions=${load.actions}`);
+  const response = compose(guarded.text, false);
   if (guarded.fellBack) {
     console.warn('[chat] grounding guard fell back to deterministic options (counts only)');
   }
@@ -539,6 +545,7 @@ export async function POST(req: Request) {
     ranked_pathways: ranking,
     excluded_prices: ranking?.excludedPrices ?? [],
     program_phone: programPhone,
+    ...persona,
   });
 }
 

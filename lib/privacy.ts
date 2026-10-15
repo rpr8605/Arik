@@ -25,6 +25,7 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   // ledger is the user's own data too - "erase everything" includes it.
   await del('pending_fact_corrections', (q) => q.eq('user_id', userId));
   await del('pending_case_facts', (q) => q.eq('user_id', userId));
+  await del('user_style_prefs', (q) => q.eq('user_id', userId));
   await del('consent_ledger', (q) => q.eq('user_id', userId));
   await del('case_summaries', (q) => q.eq('user_id', userId));
 

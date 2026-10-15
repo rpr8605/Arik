@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type ConsentCategory = 'language' | 'extended_retention' | 'demographic_eligibility' | 'explanation_style';
+export type ConsentCategory = 'language' | 'extended_retention' | 'demographic_eligibility' | 'explanation_style' | 'style_preference';
 export type ConsentAction = 'set' | 'opt_in' | 'opt_out' | 'clear';
 
 export async function recordConsent(

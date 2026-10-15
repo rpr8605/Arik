@@ -18,6 +18,16 @@ interface Message {
   corrections?: Correction[];
 }
 
+function STYLE_WORDS(offer: { length?: string; order?: string }): string {
+  const parts: string[] = [];
+  if (offer.length === 'short') parts.push('short answers');
+  if (offer.length === 'detailed') parts.push('detailed answers');
+  if (offer.length === 'normal') parts.push('normal-length answers');
+  if (offer.order === 'answer_first') parts.push('the answer first');
+  if (offer.order === 'context_first') parts.push('the background first');
+  return parts.join(' and ') || 'this';
+}
+
 const FIELD_LABELS: Record<string, string> = {
   employer_name: 'employer',
   institution_name: 'hospital or clinic',
@@ -135,6 +145,11 @@ export function Thread({
   const [resolved, setResolved] = useState<Record<string, string>>({});
   const [programPhone, setProgramPhone] = useState<string | null>(null);
   const [comingSoon, setComingSoon] = useState<string | null>(null);
+  // Persona one-tap offers (2026-10-14): remember a style the person just
+  // asked for, or switch to Spanish. Both are explicit, never automatic.
+  const [styleOffer, setStyleOffer] = useState<{ length?: string; order?: string } | null>(null);
+  const [langOffer, setLangOffer] = useState<'es' | null>(null);
+  const [offerNote, setOfferNote] = useState<string | null>(null);
   const sentFirst = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -186,6 +201,9 @@ export function Thread({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
       setProgramPhone(json.program_phone ?? null);
+      setStyleOffer(json.style_suggestion ?? null);
+      setLangOffer(json.language_suggestion === 'es' ? 'es' : null);
+      setOfferNote(null);
       setMessages((m) => [
         ...m,
         {
@@ -199,6 +217,39 @@ export function Thread({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function authedFetch(url: string, init: RequestInit) {
+    const {
+      data: { session },
+    } = await supabaseBrowser().auth.getSession();
+    return fetch(url, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+    });
+  }
+
+  async function rememberStyle() {
+    if (!styleOffer) return;
+    try {
+      const res = await authedFetch('/api/preferences/style', { method: 'PUT', body: JSON.stringify(styleOffer) });
+      if (!res.ok) throw new Error();
+      setOfferNote('Saved. You can change or delete it on the home screen.');
+    } catch {
+      setOfferNote("Couldn't save that right now.");
+    }
+    setStyleOffer(null);
+  }
+
+  async function switchToSpanish() {
+    try {
+      const res = await authedFetch('/api/preferences', { method: 'PUT', body: JSON.stringify({ preferred_language: 'es' }) });
+      if (!res.ok) throw new Error();
+      setOfferNote('Listo: Arik le responderá en español.');
+    } catch {
+      setOfferNote('No se pudo cambiar el idioma ahora.');
+    }
+    setLangOffer(null);
   }
 
   async function resolveCorrection(id: string, action: 'confirm' | 'dismiss') {
@@ -258,6 +309,27 @@ export function Thread({
           </div>
         ))}
         {busy && <p>Arik is working…</p>}
+        {styleOffer && !busy ? (
+          <div className="card" role="group" aria-label="Remember this preference" style={{ marginBottom: '1rem', padding: '0.9rem 1rem' }}>
+            <p style={{ margin: '0 0 0.5rem' }}>
+              Want me to remember {STYLE_WORDS(styleOffer)} for next time?
+            </p>
+            <div className="actions">
+              <button type="button" onClick={rememberStyle}>Remember this</button>
+              <button type="button" onClick={() => setStyleOffer(null)}>No thanks</button>
+            </div>
+          </div>
+        ) : null}
+        {langOffer && !busy ? (
+          <div className="card" role="group" aria-label="Cambiar a español" lang="es" style={{ marginBottom: '1rem', padding: '0.9rem 1rem' }}>
+            <p style={{ margin: '0 0 0.5rem' }}>¿Prefiere que Arik le responda en español?</p>
+            <div className="actions">
+              <button type="button" onClick={switchToSpanish}>Sí, en español</button>
+              <button type="button" onClick={() => setLangOffer(null)}>No, gracias</button>
+            </div>
+          </div>
+        ) : null}
+        {offerNote ? <p role="status">{offerNote}</p> : null}
         <div ref={endRef} className="chat-end" />
       </div>
       <form

@@ -71,3 +71,27 @@ export async function getCaseManagedPatient(
   if (mpError) throw mpError;
   return mp ? { id: mp.id, zip_code: mp.zip_code ?? null } : null;
 }
+
+// Persona intro (2026-10-14): has this user had Arik reply to them in any
+// OTHER conversation? Decides the full intro vs "Hi, it's Arik again".
+// Fails soft to false (the full intro is harmless).
+export async function userHasEarlierConversation(userId: string, currentSessionId: string): Promise<boolean> {
+  try {
+    const { data: sessions, error } = await supabaseAdmin()
+      .from('chat_sessions')
+      .select('id')
+      .eq('user_id', userId)
+      .neq('id', currentSessionId)
+      .limit(50);
+    if (error || !sessions?.length) return false;
+    const { data: msgs, error: msgError } = await supabaseAdmin()
+      .from('chat_messages')
+      .select('id')
+      .in('session_id', sessions.map((s) => s.id))
+      .eq('role', 'assistant')
+      .limit(1);
+    return !msgError && (msgs ?? []).length > 0;
+  } catch {
+    return false;
+  }
+}

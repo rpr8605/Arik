@@ -69,7 +69,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/022_pricing_ingestion.sql` →
 `db/023_price_sources_defaults_false.sql` → `db/024_nadac_displayable.sql`
 → `db/025_pharmacies_ingest_runs.sql` → `db/026_rate_limits.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–026
+→ `db/027_user_style_prefs.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–027
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -243,6 +244,17 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     + the `apiDeps` registry every guarded route calls through. The
     registry is the documented test seam for `scripts/test_auth_guards.ts`;
     app code must never rebind it.
+  - `persona/arik.ts` + `persona/styleSignals.ts` + `chatPrompt.ts` —
+    Arik's persona (2026-10-14; the persona developer guide in docs/ (ARIK_PERSONA) is the
+    guide, the one source of truth for voice/intro/crisis text is
+    `persona/arik.ts`). Code-written intro and crisis replies (988/911;
+    pharmacist/urgent care for life-sustaining meds) composed around the
+    model text; deterministic style dials from the conversation only
+    (never profile data), recomputed per turn, never stored; style block
+    goes in the UNCACHED prompt so caching holds. `test_style_neutrality.ts`
+    proves style never changes facts. Saved preferences (length/order
+    only) in `user_style_prefs` (db/027) via `/api/preferences/style`,
+    ledgered as `style_preference`.
   - `chatSubject.ts` — whose situation a chat turn is about (review fixes
     C1/C3, 2026-10-14): a caregiver case uses the MANAGED PATIENT's
     insurance/state/income (unknown today, so manufacturer copay cards are
