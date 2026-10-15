@@ -48,3 +48,26 @@ export async function getChatProfile(userId: string): Promise<any | null> {
   if (error) throw error;
   return data;
 }
+
+// Review fix C1 (2026-10-14): the managed patient a case belongs to, if
+// any, so the chat turn uses THEIR situation, not the caregiver's. Null
+// for the patient's own cases. Ownership is already checked by
+// getOwnedChatSession before this runs.
+export async function getCaseManagedPatient(
+  caseId: string,
+): Promise<{ id: string; zip_code: string | null } | null> {
+  const { data: kase, error } = await supabaseAdmin()
+    .from('cases')
+    .select('managed_patient_id')
+    .eq('id', caseId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!kase?.managed_patient_id) return null;
+  const { data: mp, error: mpError } = await supabaseAdmin()
+    .from('managed_patients')
+    .select('id, zip_code')
+    .eq('id', kase.managed_patient_id)
+    .maybeSingle();
+  if (mpError) throw mpError;
+  return mp ? { id: mp.id, zip_code: mp.zip_code ?? null } : null;
+}

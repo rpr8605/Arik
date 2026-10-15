@@ -67,3 +67,15 @@ Size: S = under an hour, M = about a session, L = more.
 - The trust receipt and the boundary line are built in code.
 
 **Suggested fix order:** C2, C1, C3, then H2 and H5 (cost and crash), H1, H3, H4. The Medium items can be batched with their nearest Critical or High fix.
+
+### Area 1 fixes (2026-10-14)
+
+| # | Status | Fix | Test that would have caught it |
+|---|---|---|---|
+| C2 | Fixed | `lib/groundingGuard.ts`: allowed numbers come only from claim-bearing values. Identifier, date, contact and code keys are skipped (`id`, `*_id`, `*_at`, `*_date`, url, ndc, npi, ncpdp, phone, fax, zip), and UUID, date, URL and phone shapes are removed from free text. In replies, dates and plain years (1990-2099) are no longer bare-number claims; a year written as money is still checked. | `scripts/test_grounding_guard.ts`, "C2:" cases. The review probe is reproduced: invented $10, $25, $30, $45, $99, $150, $2026, $64111, $855, $2045 and $14 are all flagged; the real $3,000 / $3K passes. |
+| C1 | Fixed (interim) | New `lib/chatSubject.ts`; the route resolves the case subject once per turn (`apiDeps.getCaseManagedPatient`). For a managed patient: insurance, state, income and household are the patient's (unknown today), never the caregiver's. With unknown coverage every manufacturer copay path is held back, with a plain reason, and is kept out of ranking. Medications are scoped by `managed_patient_id`. Profile-bound facts are no longer written to the caregiver's profile; medication rows carry the managed patient. | `scripts/test_chat_subject.ts`: an employer-plan caregiver helping a patient of unknown coverage gets the copay card held back; own Medicare and own commercial cases are unchanged. |
+| C3 | Fixed | The model sees only `MODEL_PROFILE_FIELDS` (language, explanation style, insurance type, state) and medications as drug + dose. Enforced both where the route builds the context and inside `generateResponse` and the guard. | `scripts/test_chat_subject.ts`: demographic flags, conditions, income, employer, plan name, zip, household and prescriber never appear. |
+
+**Follow-up (not built):** store a managed patient's coverage, with a migration and a plan-type control for the managed patient. Until then caregivers never see copay cards for the person they help. That is safe, but loses an option for commercially insured patients.
+
+**Not verified end to end:** the live chat path with a real caregiver case, which needs paid model calls. The decision logic is covered by pure tests and the route compiles and type-checks; `test_auth_guards.ts` passes with the new lookup on the route.

@@ -20,7 +20,15 @@ import { buildFallbackOptions, buildTrustReceipt } from '@/lib/trustReceipt';
 import { apiDeps, requireUser } from '@/lib/apiAuth';
 import { rateLimitResponse } from '@/lib/rateLimit';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
-import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
+import { COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
+import {
+  MANAGED_UNKNOWN_COVERAGE_REASON,
+  modelMedications,
+  modelProfile,
+  partitionCopayCardsForSubject,
+  resolveChatSubject,
+  subjectModelProfile,
+} from '@/lib/chatSubject';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
 import { buildPromptRetrievedContext } from '@/lib/chatRetrieval';
 import type { PriceSourceConsent } from '@/lib/pricing/enforcement';
@@ -177,15 +185,20 @@ Schema:
 }
 
 // --- Step 2: query the brain, not the model ---
-async function retrieveContext(userId: string, intent: Intent, profile: any) {
+async function retrieveContext(userId: string, intent: Intent, profile: any, managedPatientId: string | null) {
   // profile arrives pre-fetched: the route needs it before retrieval for
   // language and fact-merge, and maybeSingle makes a missing row (new
   // user, incremental onboarding per CRISIS_AWARE_DESIGN.md) a null, not
   // an error.
-  const { data: medications } = await supabase()
+  // Medications of the person the case is about (review fix C1): the
+  // managed patient's rows for a caregiver case, else the user's own.
+  const medQuery = supabase()
     .from('user_medications')
     .select('*, drugs(*)')
     .eq('user_id', userId);
+  const { data: medications } = await (managedPatientId
+    ? medQuery.eq('managed_patient_id', managedPatientId)
+    : medQuery.is('managed_patient_id', null));
 
   let drugQuery = supabase().from('drugs').select('id, name, brand_names');
   if (intent.drug_name) {
@@ -244,8 +257,8 @@ export async function generateResponse(userMessage: string, context: any, histor
   });
 
   const groundedInput = `
-USER_PROFILE: ${JSON.stringify(context.profile)}
-USER_MEDICATIONS: ${JSON.stringify(context.medications)}
+USER_PROFILE: ${JSON.stringify(modelProfile(context.profile))}
+USER_MEDICATIONS: ${JSON.stringify(modelMedications(context.medications))}
 RETRIEVED_CONTEXT: ${JSON.stringify(retrievedContext)}
 CONVERSATION_HISTORY: ${JSON.stringify(history)}
 USER_MESSAGE: ${userMessage}
@@ -305,7 +318,7 @@ export async function generateGroundedResponse(opts: {
   });
   const facts = buildAllowedFacts({
     retrievedContext,
-    profile: opts.context.profile,
+    profile: modelProfile(opts.context.profile),
     knownPrograms: await allProgramTitles(),
     allowedTitles: (opts.context.exploits ?? []).map((e: any) => e.title),
   });
@@ -366,6 +379,13 @@ export async function POST(req: Request) {
   const profile = await apiDeps.getChatProfile(userId);
   const lang = responseLanguage(profile);
 
+  // Whose situation this turn is about (review fix C1): the managed
+  // patient for a caregiver case, else the user. Insurance, state and
+  // income come from the subject; language and explanation style from the
+  // person reading.
+  const managedPatient = session.case_id ? await apiDeps.getCaseManagedPatient(session.case_id) : null;
+  const subject = resolveChatSubject({ userProfile: profile, managedPatient });
+
   const intent = await extractIntent(message);
 
   // Extraction produced nothing usable -> ask for the one missing thing,
@@ -403,24 +423,33 @@ export async function POST(req: Request) {
     userId,
     session.case_id ?? null,
     intent,
+    { managedPatientId: subject.managedPatientId },
   );
 
-  const context = await retrieveContext(userId, intent, profile);
+  const context = await retrieveContext(userId, intent, profile, subject.managedPatientId);
 
   // AKS hard-block (lib/medicareEligibility.ts): manufacturer copay cards
   // are federally illegal for Medicare/Medicaid patients. They leave the
   // viable set entirely, and the patient is told why by this deterministic
   // string - code-level, never model-optional, never silently omitted.
-  const { viable, blocked } = partitionCopayCardsForInsurance(
-    context.exploits ?? [],
-    profile?.insurance_type,
-  );
-  const blockedNote = blocked.length > 0
+  // For a managed patient whose coverage Arik doesn't know, every
+  // manufacturer copay path is held back too (review fix C1).
+  const { viable, blocked, reason: blockReason } = partitionCopayCardsForSubject(context.exploits ?? [], subject);
+  const blockedNote = blockReason === 'government'
     ? `\n\nWhy you're not seeing a manufacturer copay card here: ${COPAY_CARD_BLOCK_REASON} ` +
       `Blocked for your coverage: ${blocked.map((e: any) => e.title).join('; ')}. ` +
       'The legal pathways for your coverage are the non-card options - patient assistance programs, foundation grants, and similar programs.'
-    : '';
-  const modelContext: Record<string, any> = { ...context, exploits: viable, blockedCards: blocked };
+    : blockReason === 'managed_unknown'
+      ? `\n\nWhy you're not seeing a manufacturer copay card here: ${MANAGED_UNKNOWN_COVERAGE_REASON} ` +
+        `Held back: ${blocked.map((e: any) => e.title).join('; ')}.`
+      : '';
+  // The model sees only the minimal subject profile (review fix C3).
+  const modelContext: Record<string, any> = {
+    ...context,
+    profile: subjectModelProfile(subject),
+    exploits: viable,
+    blockedCards: blocked,
+  };
 
   // The ranking engine (lib/ranking.ts): deterministic pathway ordering
   // with 3-12 month trajectory costs. Runs only when something drug-
@@ -431,13 +460,15 @@ export async function POST(req: Request) {
       ? await rankSavingsPathsForDrug({
           drugName: intent.drug_name ?? '',
           patient: {
-            insuranceType: profile?.insurance_type ?? null,
-            stateCode: profile?.state ?? null,
-            incomePctFpl: profile?.income_pct_fpl ?? null,
-            householdSize: profile?.household_size ?? null,
+            insuranceType: subject.insuranceType,
+            stateCode: subject.state,
+            incomePctFpl: subject.incomePctFpl,
+            householdSize: subject.householdSize,
             drugCovered: intent.drug_covered ?? null,
           },
-          exploits: context.exploits ?? [],
+          // Unknown managed-patient coverage: the ranker never sees the
+          // held-back copay cards, so it can't rank one (review fix C1).
+          exploits: blockReason === 'managed_unknown' ? viable : context.exploits ?? [],
           pricePoints: context.prices ?? [],
         })
       : null;
@@ -472,8 +503,8 @@ export async function POST(req: Request) {
   // Medicare proof case. Everything else stays 'standard'.
   const isEliquisMedicare =
     /eliquis|apixaban/i.test(intent.drug_name ?? '') &&
-    isGovernmentInsurance(profile?.insurance_type);
-  const useCardFormat = profile?.explanation_style === 'simple' || isEliquisMedicare;
+    isGovernmentInsurance(subject.insuranceType);
+  const useCardFormat = subject.explanationStyle === 'simple' || isEliquisMedicare;
 
   const guarded = await generateGroundedResponse({
     message,

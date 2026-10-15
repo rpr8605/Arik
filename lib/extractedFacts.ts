@@ -155,71 +155,81 @@ async function resolveDrugId(sb: SupabaseClient, drugName: string): Promise<stri
   return (data ?? []).length === 1 ? data![0].id : null;
 }
 
+// opts.managedPatientId (review fix C1, 2026-10-14): set when the case
+// belongs to a managed patient. Their facts must never land in the
+// caregiver's own profile, and there is no managed-patient profile table
+// yet, so profile-bound facts (employer, plan, location) are not stored
+// for a managed case; case-scoped and medication facts still are, with
+// medication rows tied to the managed patient.
 export async function mergeExtractedFacts(
   sb: SupabaseClient,
   userId: string,
   caseId: string | null,
   facts: ExtractedFacts,
+  opts: { managedPatientId?: string | null } = {},
 ): Promise<PendingCorrection[]> {
   const corrections: PendingCorrection[] = [];
   const push = (c: PendingCorrection | null) => {
     if (c && !corrections.some((x) => x.id === c.id)) corrections.push(c);
   };
+  const managedPatientId = opts.managedPatientId ?? null;
 
   // --- Profile-bound fields (exist with or without a case) ---
-  const { data: profile } = await sb
-    .from('user_matching_profile')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
-  // Direct profile writes are batched into one update/upsert at the end.
-  const profileWrites: Record<string, string> = {};
-  const profileTarget = (field: string) => ({
-    userId,
-    caseId,
-    targetTable: 'user_matching_profile',
-    targetId: userId,
-    field,
-  });
-  const queueProfile = (field: string, value: string) => async () => {
-    profileWrites[field] = value;
-  };
+  if (!managedPatientId) {
+    const { data: profile } = await sb
+      .from('user_matching_profile')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    // Direct profile writes are batched into one update/upsert at the end.
+    const profileWrites: Record<string, string> = {};
+    const profileTarget = (field: string) => ({
+      userId,
+      caseId,
+      targetTable: 'user_matching_profile',
+      targetId: userId,
+      field,
+    });
+    const queueProfile = (field: string, value: string) => async () => {
+      profileWrites[field] = value;
+    };
 
-  push(
-    await setOrCorrect(sb, profileTarget('employer_name'), profile?.employer_name, facts.employer_name, queueProfile('employer_name', clean(facts.employer_name) ?? '')),
-  );
-  push(
-    await setOrCorrect(sb, profileTarget('insurance_plan_name'), profile?.insurance_plan_name, facts.insurance_plan_name, queueProfile('insurance_plan_name', clean(facts.insurance_plan_name) ?? '')),
-  );
-
-  // Location: raw text is always stored verbatim; zip/state are derived
-  // deterministically and never trigger a clarifying question.
-  const rawLocation = clean(facts.state_or_location);
-  if (rawLocation) {
     push(
-      await setOrCorrect(sb, profileTarget('state_or_location_raw'), profile?.state_or_location_raw, rawLocation, queueProfile('state_or_location_raw', rawLocation)),
+      await setOrCorrect(sb, profileTarget('employer_name'), profile?.employer_name, facts.employer_name, queueProfile('employer_name', clean(facts.employer_name) ?? '')),
     );
-    const resolved = resolveLocation(rawLocation);
-    if (resolved.zip) {
-      push(await setOrCorrect(sb, profileTarget('zip_code'), profile?.zip_code, resolved.zip, queueProfile('zip_code', resolved.zip)));
-    }
-    if (resolved.state) {
-      push(await setOrCorrect(sb, profileTarget('state'), profile?.state, resolved.state, queueProfile('state', resolved.state)));
-    }
-  }
+    push(
+      await setOrCorrect(sb, profileTarget('insurance_plan_name'), profile?.insurance_plan_name, facts.insurance_plan_name, queueProfile('insurance_plan_name', clean(facts.insurance_plan_name) ?? '')),
+    );
 
-  if (Object.keys(profileWrites).length > 0) {
-    if (profile) {
-      const { error } = await sb
-        .from('user_matching_profile')
-        .update({ ...profileWrites, updated_at: new Date().toISOString() })
-        .eq('id', userId);
-      if (error) throw error;
-    } else {
-      const { error } = await sb
-        .from('user_matching_profile')
-        .upsert({ id: userId, ...profileWrites });
-      if (error) throw error;
+    // Location: raw text is always stored verbatim; zip/state are derived
+    // deterministically and never trigger a clarifying question.
+    const rawLocation = clean(facts.state_or_location);
+    if (rawLocation) {
+      push(
+        await setOrCorrect(sb, profileTarget('state_or_location_raw'), profile?.state_or_location_raw, rawLocation, queueProfile('state_or_location_raw', rawLocation)),
+      );
+      const resolved = resolveLocation(rawLocation);
+      if (resolved.zip) {
+        push(await setOrCorrect(sb, profileTarget('zip_code'), profile?.zip_code, resolved.zip, queueProfile('zip_code', resolved.zip)));
+      }
+      if (resolved.state) {
+        push(await setOrCorrect(sb, profileTarget('state'), profile?.state, resolved.state, queueProfile('state', resolved.state)));
+      }
+    }
+
+    if (Object.keys(profileWrites).length > 0) {
+      if (profile) {
+        const { error } = await sb
+          .from('user_matching_profile')
+          .update({ ...profileWrites, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+        if (error) throw error;
+      } else {
+        const { error } = await sb
+          .from('user_matching_profile')
+          .upsert({ id: userId, ...profileWrites });
+        if (error) throw error;
+      }
     }
   }
 
@@ -259,11 +269,16 @@ export async function mergeExtractedFacts(
   if (prescriber) {
     const drugId = facts.drug_name ? await resolveDrugId(sb, facts.drug_name) : null;
     if (drugId) {
-      const { data: med } = await sb
+      // The medication row belongs to whoever the case is about: the
+      // managed patient, or the user themselves (managed_patient_id null).
+      const medQuery = sb
         .from('user_medications')
         .select('id, prescriber_name')
         .eq('user_id', userId)
-        .eq('drug_id', drugId)
+        .eq('drug_id', drugId);
+      const { data: med } = await (managedPatientId
+        ? medQuery.eq('managed_patient_id', managedPatientId)
+        : medQuery.is('managed_patient_id', null))
         .limit(1)
         .maybeSingle();
       if (med) {
@@ -287,6 +302,7 @@ export async function mergeExtractedFacts(
         // dose, and prescriber are all never-ask-twice facts from here on.
         const { error } = await sb.from('user_medications').insert({
           user_id: userId,
+          managed_patient_id: managedPatientId,
           drug_id: drugId,
           dose: clean(facts.dose),
           prescriber_name: prescriber,

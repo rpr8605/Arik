@@ -243,6 +243,13 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     + the `apiDeps` registry every guarded route calls through. The
     registry is the documented test seam for `scripts/test_auth_guards.ts`;
     app code must never rebind it.
+  - `chatSubject.ts` — whose situation a chat turn is about (review fixes
+    C1/C3, 2026-10-14): a caregiver case uses the MANAGED PATIENT's
+    insurance/state/income (unknown today, so manufacturer copay cards are
+    held back with a reason), never the caregiver's; and the model sees
+    only `MODEL_PROFILE_FIELDS` + drug/dose medications (no demographic
+    flags, conditions, income, employer, zip, prescriber). Tested by
+    `scripts/test_chat_subject.ts`.
   - `chatRetrieval.ts` — builds the chat route's RETRIEVED_CONTEXT. The
     AI/display consent gates run INSIDE it, so a barred row cannot reach
     an OpenRouter prompt without bypassing the one function the route calls.
