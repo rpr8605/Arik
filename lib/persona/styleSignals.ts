@@ -206,13 +206,18 @@ export function styleBlock(style: StyleResult): string {
 
 // --- Intro (persona section 1; added in code, never by the model) ---
 
+// introShownOnWelcome: the case was started from the welcome screen, whose
+// greeting bubble already showed the intro (owner decision 2026-10-15), so
+// the first reply doesn't repeat it. Cases started any other way keep it.
 export function introFor(input: {
   assistantMessagesInCase: number;
   userHasEarlierConversation: boolean;
   crisis: CrisisKind | null;
+  introShownOnWelcome?: boolean;
 }): 'full' | 'short' | null {
   if (input.crisis) return null;
   if (input.assistantMessagesInCase > 0) return null;
+  if (input.introShownOnWelcome) return null;
   return input.userHasEarlierConversation ? 'short' : 'full';
 }
 

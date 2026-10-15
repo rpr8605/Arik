@@ -13,10 +13,10 @@ export default async function CasePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ first?: string }>;
+  searchParams: Promise<{ first?: string; from?: string }>;
 }) {
   const { id } = await params;
-  const { first } = await searchParams;
+  const { first, from } = await searchParams;
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -81,6 +81,7 @@ export default async function CasePage({
           sessionId={session.id}
           initialMessages={(messages ?? []) as { role: string; content: string }[]}
           firstMessage={first ?? null}
+          introShown={from === 'welcome'}
         />
       ) : (
         <p>No conversation thread exists for this case yet.</p>

@@ -105,6 +105,8 @@ check('first reply ever -> full intro', introFor({ assistantMessagesInCase: 0, u
 check('first reply in a new case for a returning user -> short intro', introFor({ assistantMessagesInCase: 0, userHasEarlierConversation: true, crisis: null }) === 'short');
 check('later replies -> no intro', introFor({ assistantMessagesInCase: 2, userHasEarlierConversation: false, crisis: null }) === null);
 check('crisis -> no intro', introFor({ assistantMessagesInCase: 0, userHasEarlierConversation: false, crisis: 'self_harm' }) === null);
+check('case started from the welcome screen -> no repeat intro', introFor({ assistantMessagesInCase: 0, userHasEarlierConversation: false, crisis: null, introShownOnWelcome: true }) === null);
+check('case started another way -> intro kept', introFor({ assistantMessagesInCase: 0, userHasEarlierConversation: false, crisis: null, introShownOnWelcome: false }) === 'full');
 check('intro text is exact', INTRO.en.full.startsWith("Hi, I'm Arik. I'm an AI that works for you, not for your insurance company, pharmacy or drug maker.") && INTRO.en.short === "Hi, it's Arik again.");
 
 // --- Composition order ---

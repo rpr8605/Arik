@@ -142,7 +142,7 @@ export function NewCaseForm({
       });
       const json = await res.json();
       if (res.ok) {
-        router.push(`/cases/${json.caseId}?first=${encodeURIComponent(message)}`);
+        router.push(`/cases/${json.caseId}?first=${encodeURIComponent(message)}&from=welcome`);
       } else {
         setError(json.error ?? 'Something went wrong starting your case.');
         setBusy(false);

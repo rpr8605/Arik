@@ -333,7 +333,9 @@ export async function POST(req: Request) {
   const limit = await apiDeps.consumeRateLimit('chat', userId, req);
   if (!limit.allowed) return rateLimitResponse(limit, req);
 
-  const { message, sessionId } = await req.json();
+  // introShown: Thread sets it on the first message of a case started
+  // from the welcome screen, which already showed the intro.
+  const { message, sessionId, introShown } = await req.json();
 
   // Ownership gate (M01-AC2, audit fix 2026-10-05): the service-role
   // client bypasses RLS, so the session row is resolved through a helper
@@ -378,6 +380,7 @@ export async function POST(req: Request) {
     assistantMessagesInCase,
     userHasEarlierConversation: assistantMessagesInCase === 0 ? await apiDeps.userHasEarlierConversation(userId, sessionId) : true,
     crisis: style.crisis,
+    introShownOnWelcome: introShown === true,
   });
   const compose = (body: string, shortCircuit: boolean) =>
     composeReply({ body, crisis: style.crisis, intro, lang, shortCircuit });

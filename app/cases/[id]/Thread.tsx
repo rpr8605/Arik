@@ -132,10 +132,13 @@ export function Thread({
   sessionId,
   initialMessages,
   firstMessage,
+  introShown = false,
 }: {
   sessionId: string;
   initialMessages: Message[];
   firstMessage: string | null;
+  // The welcome screen already showed Arik's intro; the first reply skips it.
+  introShown?: boolean;
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
@@ -182,7 +185,7 @@ export function Thread({
     };
   }, []);
 
-  async function send(text: string) {
+  async function send(text: string, opts: { introShown?: boolean } = {}) {
     setBusy(true);
     setError(null);
     setMessages((m) => [...m, { role: 'user', content: text }]);
@@ -196,7 +199,7 @@ export function Thread({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({ message: text, sessionId }),
+        body: JSON.stringify({ message: text, sessionId, introShown: opts.introShown === true }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
@@ -279,7 +282,7 @@ export function Thread({
   useEffect(() => {
     if (firstMessage && !sentFirst.current) {
       sentFirst.current = true;
-      send(firstMessage);
+      send(firstMessage, { introShown });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstMessage]);
