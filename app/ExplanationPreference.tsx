@@ -94,8 +94,8 @@ export function ExplanationPreference({ current }: { current: string | null }) {
           {o.label}
         </label>
       ))}
-      {state === 'saved' ? <span> — saved</span> : null}
-      {state === 'error' ? <span role="alert"> — couldn&apos;t save, try again</span> : null}
+      {state === 'saved' ? <span> Saved.</span> : null}
+      {state === 'error' ? <span role="alert"> Couldn&apos;t save, try again</span> : null}
       {saved ? (
         <div className="actions" style={{ alignItems: 'center' }}>
           <span>Arik remembers: {saved}.</span>

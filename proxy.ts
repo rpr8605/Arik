@@ -50,6 +50,8 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
+// Static brand files and the app icons skip the proxy: an image request
+// should never mint an anonymous session.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|brand/|icon.png|apple-icon.png|opengraph-image).*)'],
 };

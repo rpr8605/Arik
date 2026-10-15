@@ -215,12 +215,18 @@ def check_docs_reference_real_tables(schema_table_names):
 
 def check_md_file_references():
     print("\n--- Checking .md docs for referenced .md files that don't exist ---")
-    existing = {p.name for p in REPO_ROOT.glob("*.md")}
+    # A referenced doc may live at the root or under docs/ (docs/kimi,
+    # docs/design, ...); only node_modules and build output are excluded.
+    existing = {
+        p.name
+        for p in REPO_ROOT.rglob("*.md")
+        if not any(part in ("node_modules", ".next", ".git") for part in p.parts)
+    }
     problems = 0
     for md_path in REPO_ROOT.glob("*.md"):
         text = md_path.read_text()
         # Any Something_Like_This.md (or chat_system_prompt.md) mention must
-        # point at a file that actually exists at the repo root - dangling
+        # point at a file that actually exists in the repo - dangling
         # doc references are how spec drift hides.
         refs = set(re.findall(r"\b([A-Za-z][A-Za-z0-9_]*)\.md\b", text))
         for ref in sorted(refs):
@@ -249,6 +255,63 @@ def check_handoff_lists_all_files():
             warn(f"{fname} is not mentioned anywhere in HANDOFF.md - confirm it's intentionally out of scope or add a reference")
 
 
+def strip_js_comments(text):
+    """Remove // and /* */ comments from TS/TSX source, leaving string
+    literals, template literals and JSX text in place. Good enough for a
+    copy check: a // inside JSX text is treated as a comment, which can
+    only hide a dash, never invent one."""
+    out = []
+    i, n = 0, len(text)
+    quote = None
+    while i < n:
+        c = text[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+            i += 1
+            continue
+        if c in "'\"`":
+            quote = c
+            out.append(c)
+            i += 1
+            continue
+        if text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j == -1 else j
+            continue
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j == -1 else j + 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def check_no_em_dash_in_ui():
+    """FIRST_RUN_AND_BRAND.md (2026-10-14): no em dashes anywhere in the UI.
+    Every string and JSX text in app/ and lib/ is checked; comments are not."""
+    print("\n--- Checking for em dashes in user-facing strings (app/, lib/) ---")
+    bad = 0
+    for folder in ("app", "lib"):
+        for path in sorted((REPO_ROOT / folder).rglob("*")):
+            if path.suffix not in (".ts", ".tsx") or not path.is_file():
+                continue
+            code = strip_js_comments(path.read_text(encoding="utf-8"))
+            for lineno, line in enumerate(code.splitlines(), 1):
+                if "—" in line or "&mdash;" in line or "\\u2014" in line:
+                    bad += 1
+                    rel = path.relative_to(REPO_ROOT).as_posix()
+                    fail(f"em dash in {rel} (code line {lineno}): {line.strip()[:90]}")
+    if bad == 0:
+        ok("no em dashes in app/ or lib/ strings")
+
+
 def main():
     print("=" * 60)
     print("Arik pre-build validation")
@@ -260,6 +323,7 @@ def main():
     check_docs_reference_real_tables(table_names)
     check_md_file_references()
     check_handoff_lists_all_files()
+    check_no_em_dash_in_ui()
 
     print("\n" + "=" * 60)
     print(f"RESULT: {len(FAILURES)} failure(s), {len(WARNINGS)} warning(s)")

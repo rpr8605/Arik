@@ -10,17 +10,24 @@
    layout.tsx). LIGHT ONLY by design — no dark-scheme variant. */
 
 :root {
-  --arik-ink: #1f3d5a; /* slate */
-  --arik-muted: #51637a;
-  --arik-brand: #0fa68e; /* emerald */
-  --arik-brand-dark: #0b8a76;
-  --arik-brand-tint: rgba(15, 166, 142, 0.12);
+  /* Brand colors taken from the logo (FIRST_RUN_AND_BRAND.md, 2026-10-14):
+     navy #325773 (the A), teal #109890, and the wordmark's darker navy for
+     body text. Never recolor the logo itself. */
+  --arik-navy: #325773;
+  --arik-teal: #109890;
+  --arik-ink: #22425c;
+  --arik-muted: #4a6983; /* navy tint, not a generic gray */
+  --arik-brand: var(--arik-teal);
+  --arik-brand-dark: #0b7a74; /* teal at text contrast (white on it 5:1) */
+  --arik-brand-darker: #08605b;
+  --arik-brand-tint: rgba(16, 152, 144, 0.12);
+  --arik-navy-tint: rgba(50, 87, 115, 0.08);
   --arik-sky: #7ec6f4;
   --arik-card: #ffffff;
-  --arik-border: rgba(31, 61, 90, 0.1);
-  --arik-border-strong: rgba(31, 61, 90, 0.35);
-  --arik-shadow: 0 8px 24px rgba(31, 61, 90, 0.06);
-  --arik-alert-bg: #fff3cd;
+  --arik-border: rgba(50, 87, 115, 0.12);
+  --arik-border-strong: rgba(50, 87, 115, 0.38);
+  --arik-shadow: 0 8px 24px rgba(50, 87, 115, 0.08);
+  --arik-coral: #b3362f; /* demo bar: white text 6:1 */
   --arik-radius-card: 18px;
 }
 
@@ -64,7 +71,7 @@ body {
   height: 420px;
   bottom: -110px;
   left: -110px;
-  background: radial-gradient(circle, rgba(15, 166, 142, 0.45), rgba(15, 166, 142, 0));
+  background: radial-gradient(circle, rgba(16, 152, 144, 0.4), rgba(16, 152, 144, 0));
 }
 
 /* Content sits above the blobs. */
@@ -94,11 +101,6 @@ main {
    app draw edge to edge; these keep content clear of the notch, the
    rounded corners and the home bar. Long words, codes and URLs wrap
    instead of pushing the page sideways at 360px. */
-.device-screen > [role="note"] {
-  padding-top: max(0.5rem, env(safe-area-inset-top)) !important;
-  padding-left: max(1rem, env(safe-area-inset-left)) !important;
-  padding-right: max(1rem, env(safe-area-inset-right)) !important;
-}
 main,
 .md {
   overflow-wrap: anywhere;
@@ -186,7 +188,7 @@ a:hover {
 /* Primary buttons: 56px minimum, 18px text — unambiguous targets. */
 button,
 input[type="submit"] {
-  background: var(--arik-brand);
+  background: var(--arik-brand-dark);
   color: #fff;
   border: none;
   border-radius: 14px;
@@ -199,7 +201,7 @@ input[type="submit"] {
 }
 
 button:hover:not(:disabled) {
-  background: var(--arik-brand-dark);
+  background: var(--arik-brand-darker);
 }
 
 button:disabled {
@@ -309,73 +311,6 @@ section[aria-label],
   box-shadow: var(--arik-shadow);
   border-radius: var(--arik-radius-card);
   padding: 1.5rem;
-}
-
-/* Guided entry (Part 2, 2026-08-13): suggested-prompt chips are tappable
-   cards, stacked full-width; the open textarea sits de-emphasized under
-   a divider as the secondary path. */
-.scope-line {
-  font-size: 17px;
-  color: var(--arik-muted);
-  margin: 0 0 1rem;
-}
-
-.chips {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-button.chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-  width: 100%;
-  min-height: 56px;
-  padding: 0.9rem 1.25rem;
-  text-align: left;
-  background: #fff;
-  color: var(--arik-ink);
-  border: 1px solid var(--arik-border);
-  border-radius: 14px;
-  box-shadow: var(--arik-shadow);
-  font-size: 17px;
-  font-weight: 400;
-}
-button.chip strong {
-  font-family: var(--font-outfit), var(--font-source-sans), sans-serif;
-  font-size: 19px;
-  font-weight: 600;
-}
-button.chip span {
-  color: var(--arik-muted);
-  font-size: 16px;
-}
-button.chip:hover:not(:disabled) {
-  background: #fff;
-  border-color: var(--arik-brand);
-}
-
-.entry-divider {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 1.5rem 0 1rem;
-  color: var(--arik-muted);
-  font-size: 16px;
-}
-.entry-divider::before,
-.entry-divider::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--arik-border-strong);
-}
-
-/* The secondary path is visually quieter than the chips. */
-.own-entry textarea {
-  background: rgba(255, 255, 255, 0.65);
-  font-size: 17px;
 }
 
 /* Chat thread legibility */
@@ -562,5 +497,282 @@ a.pill-link {
   section[aria-label],
   .card {
     padding: 1.1rem;
+  }
+}
+
+/* ---- First-run experience and brand (FIRST_RUN_AND_BRAND.md, 2026-10-15) ---- */
+
+/* Splash: once per session (gate script in layout.tsx), about 1.2s total:
+   the logo fades in over 0.8s, holds, then the whole screen fades away. */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #eaf6fb 0%, #fafbfc 45%, #eaf9f4 100%);
+  animation: splash-out 1.2s ease forwards;
+  pointer-events: none;
+}
+.splash img {
+  width: 235px;
+  height: auto;
+  opacity: 0;
+  animation: splash-in 0.8s ease forwards;
+}
+@keyframes splash-in {
+  to { opacity: 1; }
+}
+@keyframes splash-out {
+  0%, 80% { opacity: 1; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; }
+}
+html[data-splash="off"] .splash {
+  display: none;
+}
+
+/* Demo bar: one thin coral-red ticker at the very top. */
+.demo-ticker {
+  position: relative;
+  overflow: hidden;
+  background: var(--arik-coral);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 28px;
+  height: calc(28px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.demo-ticker-track {
+  display: inline-flex;
+  animation: ticker 18s linear infinite;
+}
+.demo-ticker-track span {
+  padding-right: 3rem;
+}
+.demo-ticker:hover .demo-ticker-track,
+.demo-ticker.paused .demo-ticker-track {
+  animation-play-state: paused;
+}
+.demo-ticker-static {
+  display: none;
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Header: logo top left, EN | ES top right. */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.35rem 1.25rem 0;
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.app-logo img {
+  display: block;
+  height: 28px;
+  width: auto;
+}
+.lang-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--arik-border-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--arik-muted);
+  font-size: 14px;
+  height: 32px;
+  margin: 6px 0;
+}
+.lang-pill button[type="button"] {
+  min-height: 44px;
+  min-width: 44px;
+  margin: -6px 0;
+  padding: 0 0.6rem;
+  border: none;
+  background: transparent;
+  color: var(--arik-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.lang-pill button[type="button"]:hover:not(:disabled) {
+  background: transparent;
+  color: var(--arik-brand-dark);
+}
+.lang-pill button[type="button"][aria-pressed="true"] {
+  color: var(--arik-navy);
+  text-decoration: underline;
+  text-decoration-color: var(--arik-teal);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+/* Welcome screen */
+main.home {
+  padding-top: 0.75rem;
+  padding-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 80px);
+}
+@media (min-width: 600px) and (min-height: 500px) {
+  main.home {
+    min-height: calc(100% - 80px);
+  }
+}
+.bubble {
+  border-radius: 20px;
+  padding: 0.9rem 1.1rem;
+  margin: 0.25rem 0 1.25rem;
+}
+.bubble p {
+  margin: 0 0 0.5rem;
+}
+.bubble p:last-child {
+  margin: 0;
+}
+.bubble-arik {
+  background: #fff;
+  border: 1px solid var(--arik-border);
+  border-top-left-radius: 6px;
+  box-shadow: var(--arik-shadow);
+  animation: rise 0.45s ease both;
+}
+.starters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+button.starter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 112px;
+  padding: 0.9rem;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid var(--arik-border);
+  background: #fff;
+  color: var(--arik-ink);
+  font-size: 17px;
+  line-height: 1.25;
+  box-shadow: var(--arik-shadow);
+  animation: rise 0.45s ease both;
+}
+button.starter:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--arik-teal);
+}
+.starter-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--arik-brand-tint);
+  color: var(--arik-brand-dark);
+}
+.soon-note {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  background: var(--arik-navy-tint);
+  color: var(--arik-navy);
+  font-size: 16px;
+}
+.strip-title {
+  font-size: 17px;
+  color: var(--arik-muted);
+  margin: 1.5rem 0 0.6rem;
+}
+.drug-strip {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -1.25rem;
+  padding: 0 1.25rem 0.25rem;
+}
+.drug-strip button.drug-chip {
+  flex: none;
+  min-height: 44px;
+  color: var(--arik-navy);
+  border-color: var(--arik-border-strong);
+}
+.case-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.case-list a {
+  display: flex;
+  flex-direction: column;
+  min-height: 56px;
+  padding: 0.7rem 1rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--arik-border);
+  color: var(--arik-ink);
+}
+.case-list a span {
+  color: var(--arik-muted);
+  font-size: 16px;
+}
+details.settings {
+  margin: 1.5rem 0 1rem;
+}
+details.settings summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--arik-muted);
+  font-weight: 600;
+}
+details.settings section[aria-label] {
+  margin-top: 0.75rem;
+}
+.home-composer {
+  margin-top: auto;
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash {
+    display: none;
+  }
+  .demo-ticker {
+    height: auto;
+    white-space: normal;
+    cursor: default;
+    line-height: 1.35;
+    padding: calc(0.3rem + env(safe-area-inset-top)) 1rem 0.3rem;
+    text-align: center;
+  }
+  .demo-ticker-track {
+    display: none;
+  }
+  .demo-ticker-static {
+    display: inline;
   }
 }

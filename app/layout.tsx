@@ -1,15 +1,18 @@
 import './globals.css';
 import type { Viewport } from 'next';
+import Link from 'next/link';
 import { Outfit, Source_Sans_3 } from 'next/font/google';
+import { DemoTicker } from './DemoTicker';
+import { LanguagePreference } from './LanguagePreference';
 
 // Brand fonts (2026-08-13 ticket): Outfit for headings, Source Sans 3
-// for body. Self-hosted via next/font — no third-party font requests at
+// for body. Self-hosted via next/font, so no third-party font requests at
 // runtime.
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 const sourceSans = Source_Sans_3({ subsets: ['latin'], variable: '--font-source-sans' });
 
 export const metadata = {
-  title: 'Arik',
+  title: 'Arik Health',
   description: 'Patient-side healthcare cost advocate',
 };
 
@@ -22,13 +25,20 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   interactiveWidget: 'resizes-content',
-  themeColor: '#eaf6fb',
+  themeColor: '#b3362f',
 };
+
+// Splash (FIRST_RUN_AND_BRAND.md Part 2): once per browser session, never
+// with reduced motion. This runs before first paint, so a later page load
+// in the same session never flashes the splash. The layout persists across
+// client-side navigation, so it can't replay on page changes either.
+const SPLASH_GATE = `try{var d=document.documentElement;if(sessionStorage.getItem('arik-splash')||matchMedia('(prefers-reduced-motion: reduce)').matches){d.setAttribute('data-splash','off')}else{sessionStorage.setItem('arik-splash','1')}}catch(e){document.documentElement.setAttribute('data-splash','off')}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${sourceSans.variable}`}>
+    <html lang="en" className={`${outfit.variable} ${sourceSans.variable}`} suppressHydrationWarning>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: SPLASH_GATE }} />
         {/* Fixed glow blobs over the viewport gradient (both stay put
             during scroll); content sits above them via .app-shell. */}
         <div className="glow glow-sky" aria-hidden="true" />
@@ -39,14 +49,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             both wrappers are plain blocks and the app is full screen. */}
         <div className="device app-shell">
           <div className="device-screen">
-            <div
-              role="note"
-              style={{ background: '#fff3cd', padding: '0.5rem 1rem', fontSize: '0.9rem', textAlign: 'center' }}
-            >
-              Demo build — you&apos;re on a temporary session (no sign-up needed), and anything you
-              enter here may be deleted at any time without warning. Don&apos;t rely on coming back to a
-              saved case or saved results.
+            <div className="splash" aria-hidden="true">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/arik-logo-h300.webp" alt="" width={235} height={100} />
             </div>
+            <DemoTicker />
+            <header className="app-header">
+              <Link href="/" className="app-logo" aria-label="Arik Health, home">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/arik-logo-h84.webp" alt="Arik Health" width={66} height={28} />
+              </Link>
+              <LanguagePreference />
+            </header>
             {children}
           </div>
         </div>

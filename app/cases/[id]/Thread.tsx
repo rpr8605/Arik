@@ -298,7 +298,7 @@ export function Thread({
                 onResolveCorrection={resolveCorrection}
                 onRecovery={(kind) => {
                   if (kind === 'dont_know' && !busy) {
-                    send("I don't know what to do next — can you explain this another way?");
+                    send("I don't know what to do next. Can you explain this another way?");
                   }
                 }}
                 programPhone={programPhone}
@@ -356,9 +356,9 @@ export function Thread({
         <button
           type="button"
           aria-disabled="true"
-          aria-label="Voice input — coming soon"
-          title="Voice input — coming soon"
-          onClick={() => setComingSoon('Voice input — coming soon')}
+          aria-label="Voice input: coming soon"
+          title="Voice input: coming soon"
+          onClick={() => setComingSoon('Voice input: coming soon')}
           className="icon-btn"
           style={{ opacity: 0.5, cursor: 'default' }}
         >
@@ -370,9 +370,9 @@ export function Thread({
         <button
           type="button"
           aria-disabled="true"
-          aria-label="Document or photo upload — coming soon"
-          title="Document or photo upload — coming soon"
-          onClick={() => setComingSoon('Document or photo upload — coming soon')}
+          aria-label="Document or photo upload: coming soon"
+          title="Document or photo upload: coming soon"
+          onClick={() => setComingSoon('Document or photo upload: coming soon')}
           className="icon-btn"
           style={{ opacity: 0.5, cursor: 'default' }}
         >

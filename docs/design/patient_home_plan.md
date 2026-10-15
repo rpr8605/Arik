@@ -6,6 +6,22 @@ Companion to `patient_home_screens.md` and `patient_home_data_map.md`.
 demo 5a builds, including the bills and denials walkthrough. P1 depends on
 `agent_actions` (call card) and the letters and confirms from 5a.
 
+## Owner decisions (approved 2026-10-14, recorded from FIRST_RUN_AND_BRAND.md Part 3)
+
+These settle open questions 1, 2, 3, 5 and 6 below.
+
+1. **Save your results:** anonymous users get a "Save your results" upgrade
+   (email magic link, same user id), offered right after a useful result.
+   Sample accounts never get it.
+2. **Retention:** chats keep purging on the current rule. Receipts, sent
+   letters and confirmed savings are kept until the patient deletes them.
+   (Decided, not built: the purge still removes them today. AGENTS.md and
+   DATA_RETENTION.md note the change.)
+3. **Member ID and card photo:** gated until after S4. The demo sample
+   patient can show fictional, labeled versions.
+4. **PDF library:** pdf-lib approved, exact-pinned.
+5. **Employer rollup:** minimum group size 11 before any number shows.
+
 ## Phases
 
 | Phase | Builds | Main pieces | Size |

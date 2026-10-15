@@ -64,7 +64,7 @@ export default async function CasePage({
       <h1>{kase.case_type.replaceAll('_', ' ')}</h1>
       <p>
         Status: <strong>{kase.status.replaceAll('_', ' ')}</strong>
-        {kase.next_action ? ` — next: ${kase.next_action}` : ''}
+        {kase.next_action ? `. Next: ${kase.next_action}` : ''}
       </p>
       {kase.institution_name ? <p>{kase.institution_name}</p> : null}
       {kase.resolved_at ? (

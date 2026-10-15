@@ -73,19 +73,19 @@ function eligibilityNotes(e: any, p: RankingPatient): { viable: boolean; notes: 
     return { viable: false, notes: [`Requires commercial insurance (your coverage: ${t ?? 'unknown'}).`] };
   }
   if (crit.drug_covered === true && p.drugCovered === false) {
-    return { viable: false, notes: ["Requires your plan to cover the drug — yours doesn't."] };
+    return { viable: false, notes: ["Requires your plan to cover the drug, and yours doesn't."] };
   }
   if (crit.drug_covered === false && p.drugCovered === true) {
-    return { viable: false, notes: ["This pathway is for plans that don't cover the drug — yours does."] };
+    return { viable: false, notes: ["This pathway is for plans that don't cover the drug, and yours does."] };
   }
   if (crit.requires === 'cash_pay' || crit.insurance_required === false) {
-    notes.push('No insurance required — this is a cash channel.');
+    notes.push('No insurance required: this is a cash channel.');
   }
   if (crit.income_max_usd != null) {
     if (p.incomePctFpl == null) {
-      notes.push(`Income-tested (limit $${crit.income_max_usd.toLocaleString()}/yr): your income is needed to say more — this is a "likely" path, not a confirmed one.`);
+      notes.push(`Income-tested (limit $${crit.income_max_usd.toLocaleString()}/yr): your income is needed to say more. This is a "likely" path, not a confirmed one.`);
     } else {
-      notes.push(`Income-tested (limit $${crit.income_max_usd.toLocaleString()}/yr): confirm against your exact dollar income — the program states the limit in dollars, not %FPL.`);
+      notes.push(`Income-tested (limit $${crit.income_max_usd.toLocaleString()}/yr): confirm against your exact dollar income. The program states the limit in dollars, not %FPL.`);
     }
   }
   if (crit.medicare_part_d_may_qualify === true && t === 'medicare_part_d') {
@@ -109,21 +109,21 @@ function stateNoteFor(
   if (!stateRow) {
     return {
       status: 'unverified',
-      headline: "Your state's copay-accumulator protection status is still being verified — if your plan runs an accumulator program, manufacturer assistance may not count toward your deductible.",
+      headline: "Your state's copay-accumulator protection status is still being verified. If your plan runs an accumulator program, manufacturer assistance may not count toward your deductible.",
       detail: null,
     };
   }
   if (stateRow.ban_type === 'regulatory_guidance') {
     return {
       status: 'regulatory_guidance',
-      headline: 'Your state addresses this through regulatory guidance, not a statute — real enforcement for current marketplace plan years, but less durable than a law.',
+      headline: 'Your state addresses this through regulatory guidance, not a statute: real enforcement for current marketplace plan years, but less durable than a law.',
       detail: stateRow.notes ?? null,
     };
   }
   if (stateRow.verification_status !== 'primary_source_verified') {
     return {
       status: 'unverified',
-      headline: "Your state's copay-accumulator protection status is still being verified — if your plan runs an accumulator program, manufacturer assistance may not count toward your deductible.",
+      headline: "Your state's copay-accumulator protection status is still being verified. If your plan runs an accumulator program, manufacturer assistance may not count toward your deductible.",
       detail: stateRow.notes ?? null,
     };
   }
@@ -136,7 +136,7 @@ function stateNoteFor(
   }
   return {
     status: 'verified_unprotected',
-    headline: 'Your state has no accumulator protection — if your plan runs an accumulator, manufacturer assistance may not count toward your deductible, and your cost can jump when the card maxes out.' + erisa,
+    headline: 'Your state has no accumulator protection. If your plan runs an accumulator, manufacturer assistance may not count toward your deductible, and your cost can jump when the card maxes out.' + erisa,
     detail: stateRow.notes ?? null,
   };
 }
@@ -192,16 +192,16 @@ export function rankPathways(input: {
     if (e.verification_status === 'conflicted') {
       const open = (conflictsByExploitId[e.id] ?? []).filter((c: any) => !c.resolved_at);
       if (open.length === 0 || open.some((c: any) => c.conflict_class !== 'tier_mismatch')) {
-        pendingVerification.push({ title: e.title, reason: 'Program figures conflict between sources — pending human verification, no number is trusted yet.' });
+        pendingVerification.push({ title: e.title, reason: 'Program figures conflict between sources, pending human verification, no number is trusted yet.' });
         continue;
       }
       provisionalConflictNotes = open.map((c: any) =>
-        `Official figure ($${c.value_a}) provisionally trusted; a third-party source disagrees ($${c.value_b}) — conflict noted, not treated as final.`,
+        `Official figure ($${c.value_a}) provisionally trusted; a third-party source disagrees ($${c.value_b}). Conflict noted, not treated as final.`,
       );
     } else if (e.verification_status !== 'verified_current') {
       const reason =
         e.verification_status === 'verified_historical'
-          ? 'Evidence suggests these terms have changed — pending re-verification.'
+          ? 'Evidence suggests these terms have changed, pending re-verification.'
           : 'Not yet verified against the program\'s current terms.';
       pendingVerification.push({ title: e.title, reason });
       continue;
@@ -216,14 +216,14 @@ export function rankPathways(input: {
       const fallback = bestMonthlyPrice(pricePoints);
       if (isCard(e) && stateNote?.status === 'verified_unprotected' && fallback != null && monthly != null && fallback > monthly) {
         const months = Math.max(1, Math.round(Number(e.annual_max_savings) / (fallback - monthly)));
-        notes.push(`If your plan runs an accumulator: the card's $${Number(e.annual_max_savings).toLocaleString()} annual cap could exhaust around month ${months} at this drug's known prices — after that your full deductible applies at once (estimate, using $${fallback}/mo as the fallback price).`);
+        notes.push(`If your plan runs an accumulator: the card's $${Number(e.annual_max_savings).toLocaleString()} annual cap could exhaust around month ${months} at this drug's known prices. After that your full deductible applies at once (estimate, using $${fallback}/mo as the fallback price).`);
       }
     }
     if (e.reduced_if_maximizer_detected === true) {
       notes.push('Program terms reduce the maximum if your plan runs a maximizer program.');
     }
     if (isCard(e) && stateNote) notes.push(stateNote.headline);
-    if (oneTime) notes.push('One-time offer — a bridge, not a long-term answer; pair it with a monthly pathway.');
+    if (oneTime) notes.push('One-time offer: a bridge, not a long-term answer; pair it with a monthly pathway.');
     ranked.push({
       kind: e.exploit_type,
       title: e.title,

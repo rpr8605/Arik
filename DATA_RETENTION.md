@@ -91,3 +91,11 @@ not mutually exclusive:
   we hold this" that can go directly into a Privacy Policy page - worth
   having Hunter review the specific day counts before they're published
   as a binding commitment, not just an internal default
+
+## Decided change for patient home (owner, 2026-10-14; not built yet)
+
+Chats keep purging on the current rule. Receipts, sent letters and
+confirmed savings will be kept until the patient deletes them, as part of
+patient home P1 (docs/design/patient_home_plan.md). Until that ships, the
+existing 90-day case purge still removes them. Sample (demo) cases are
+never kept: they purge after 60 minutes idle (docs/design/demo_5a_decisions.md).

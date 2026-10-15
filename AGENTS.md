@@ -169,7 +169,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     `assertLegalTransition()` — tested by `scripts/test_transitions.ts`.
     Terminal transitions (`resolved_won`/`resolved_lost`/
     `closed_by_patient`) set `resolved_at`, starting the 90-day
-    retention clock.
+    retention clock. Decided 2026-10-14, not built: receipts, sent letters
+    and confirmed savings will outlive that purge until the patient
+    deletes them (patient home P1; DATA_RETENTION.md).
   - `deadlines.ts` — deadline engine. Rules carry `basis` text; unverified
     rules store `source_id`/`last_verified_at` null; no matching rule →
     honest `no_rule` result, never a guessed deadline.
@@ -277,16 +279,24 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   coverage control), `cases/[id]` (+ Thread, DocumentUpload,
   OutcomePrompt client comps), `api/cases/start` (creates case + session
   from free text; keyword-type heuristic is a visible filing aid).
-  `NewCaseForm.tsx` is the guided entry (2026-08-13): honest scope line,
-  three suggested-drug chips (Eliquis/Dupixent/Zepbound), a divider,
-  then the de-emphasized open textarea. The Eliquis chip sets plan type
+  `NewCaseForm.tsx` is the welcome screen (FIRST_RUN_AND_BRAND.md,
+  2026-10-15): Arik's greeting bubble (persona intro), four starters
+  (prescription starts a case; bill, denial and sample patient say
+  "coming in this demo soon" until 5a), the "Try it with a real drug"
+  strip and the pinned chat box. The Eliquis button sets plan type
   to Medicare via `/api/profile/insurance-type` ONLY when the profile
   has none (never overwrites a chosen value) so the AKS hard-block
-  actually fires in the demo. `layout.tsx` carries the temp-demo banner,
-  the brand fonts (Outfit headings / Source Sans 3 body via next/font),
-  and the fixed glow blobs; `globals.css` holds the brand treatment
-  (emerald/slate, light-only by design — no dark scheme, 600px centered
-  panel at ≥640px, 56px primary / 48px pill touch targets). `proxy.ts`
+  actually fires in the demo. `layout.tsx` carries the once-per-session
+  splash (gate script before first paint; off with reduced motion), the
+  coral demo ticker (`DemoTicker.tsx`), the header (logo PNG + the
+  `LanguagePreference.tsx` EN | ES pill, still the ledgered path), the
+  brand fonts and the fixed glow blobs. Brand assets live in
+  `public/brand/` (owner's kit; logo PNGs, the traced SVG is not yet
+  approved); app icons are `app/favicon.ico`, `icon.png`, `apple-icon.png`,
+  `opengraph-image.jpg`. `globals.css` holds the brand tokens (navy
+  #325773, teal #109890 from the logo; light-only by design, 56px
+  primary / 48px pill touch targets). `validate_repo.py` fails on any em
+  dash in app/ or lib/ strings. `proxy.ts`
   refreshes the auth cookie (Next 16's name for middleware) and signs
   cookieless visitors in anonymously.
 - `scripts/` — `validate_repo.py` (structural gate), `apply_db.mjs`

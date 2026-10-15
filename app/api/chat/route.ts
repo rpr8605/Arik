@@ -84,7 +84,7 @@ const STRINGS = {
   // the refusal or reveals anything about how the system is built.
   offTopic: {
     en:
-      "This demo is focused on prescription savings — I'm not able to help " +
+      "This demo is focused on prescription savings, so I'm not able to help " +
       'with that here. Try asking about Eliquis, Dupixent, or Zepbound and ' +
       "I'll show you what Arik actually does.",
     es:

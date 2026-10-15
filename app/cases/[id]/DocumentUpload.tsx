@@ -42,7 +42,7 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
           : null,
         (json.corrections ?? []).length > 0 ? 'correction pending in the thread above' : null,
       ].filter(Boolean);
-      setResult(parts.join(' — '));
+      setResult(parts.join('. '));
     } catch (e) {
       setError((e as Error).message);
     } finally {

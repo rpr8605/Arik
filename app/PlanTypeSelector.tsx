@@ -64,12 +64,12 @@ export function PlanTypeSelector({ current }: { current: string | null }) {
           {o.label}
         </label>
       ))}
-      {state === 'saved' ? <span> — saved</span> : null}
-      {state === 'error' ? <span role="alert"> — couldn&apos;t save, try again</span> : null}
+      {state === 'saved' ? <span> Saved.</span> : null}
+      {state === 'error' ? <span role="alert"> Couldn&apos;t save, try again</span> : null}
       <div style={{ fontSize: '0.9em' }}>
         This changes which savings paths are legal to show you (for example, manufacturer copay
         cards are federally prohibited on Medicare/Medicaid). We never ask for member IDs or group
-        numbers — we can&apos;t verify them yet.
+        numbers. We can&apos;t verify them yet.
       </div>
     </section>
   );
