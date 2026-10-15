@@ -68,7 +68,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/020_conflict_classes.sql` → `db/021_explanation_style_and_support_phone.sql`
 → `db/022_pricing_ingestion.sql` →
 `db/023_price_sources_defaults_false.sql` → `db/024_nadac_displayable.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–024
+→ `db/025_pharmacies_ingest_runs.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–025
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
