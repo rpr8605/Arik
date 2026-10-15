@@ -1,5 +1,5 @@
 import './globals.css';
-import type { Viewport } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
 import { Outfit, Source_Sans_3 } from 'next/font/google';
 import { DemoTicker } from './DemoTicker';
@@ -11,9 +11,19 @@ import { LanguagePreference } from './LanguagePreference';
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 const sourceSans = Source_Sans_3({ subsets: ['latin'], variable: '--font-source-sans' });
 
-export const metadata = {
-  title: 'Arik Health',
-  description: 'Patient-side healthcare cost advocate',
+// Link preview (share-ready demo, 2026-10-15): title, description and the
+// brand kit's share image, so the link looks right in texts, email and
+// LinkedIn. NEXT_PUBLIC_SITE_URL overrides the base for other hosts.
+const TITLE = 'Arik Health: your AI patient advocate';
+const DESCRIPTION =
+  'Arik finds the lowest legal price for your prescriptions and helps you fight medical bills and insurance denials. Try the demo with sample patients.';
+const SHARE_IMAGE = { url: '/brand/arik-og-social-1200x630.jpg', width: 1200, height: 630, alt: 'Arik Health' };
+export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://arik-liard.vercel.app'),
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: { title: TITLE, description: DESCRIPTION, url: '/', siteName: 'Arik Health', type: 'website', images: [SHARE_IMAGE] },
+  twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION, images: [SHARE_IMAGE.url] },
 };
 
 // Mobile-ready pass (2026-10-14): draw under the notch and home bar

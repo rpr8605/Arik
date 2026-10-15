@@ -270,6 +270,18 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     refused (403) and "+" offers only fictional sample documents. Tested by
     `test_demo_samples.ts`, `test_auth_guards.ts`, `smoke_demo_samples.mjs`.
     **Apply db/028 before deploying with DEMO_MODE on.**
+  - `walkthrough/` + `app/walk/` + `app/samples/[key]` — the scripted demo
+    walkthroughs (docs/kimi/DEMO_WALKTHROUGHS.md, DEMO_MODE only): bill
+    (Luis), denial (Tasha), prescription (Maria/James/Dana) and the sample
+    patient homes. Scripts are data (`walkthrough/flows.ts`), letters are
+    fixtures (`walkthrough/letters.ts`), documents are generated SVGs in
+    `public/demo/docs`. No model calls, nothing uploaded or sent: receipts
+    and new jobs live in sessionStorage (`app/walk/demoJobs.ts`). The only
+    live data is Flow 1's prices via `/api/demo/rx` → `demo/rxOptions.ts`
+    (same copay-card block + ranking engine as chat; one-time offers are
+    shown as a bridge, never "Best path"). Script integrity, totals and
+    the letter-stated denial deadline are tested by
+    `test_walkthroughs.ts`; the click-through is a Playwright run.
   - `caseCard.ts` + `caseCards.ts` — the one place internal case status,
     type and field names become plain words (home cards, case header);
     `test_case_card.ts` proves no raw name reaches the screen.

@@ -12,7 +12,21 @@ import { DocumentUpload } from './DocumentUpload';
 // real file picker and camera are never opened, nothing is uploaded and
 // nothing is stored. "Take a photo" shows a fake camera view whose shutter
 // picks the sample bill in frame.
-export function AttachSheet({ caseId, demoMode, onClose }: { caseId: string; demoMode: boolean; onClose: () => void }) {
+export function AttachSheet({
+  caseId,
+  demoMode,
+  onClose,
+  only,
+  onPick,
+}: {
+  caseId: string | null;
+  demoMode: boolean;
+  onClose: () => void;
+  // Walkthrough "pick" steps: limit to these documents and hand the pick
+  // back instead of navigating.
+  only?: string[];
+  onPick?: (doc: SampleDoc) => void;
+}) {
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div
@@ -23,7 +37,11 @@ export function AttachSheet({ caseId, demoMode, onClose }: { caseId: string; dem
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-grip" aria-hidden="true" />
-        {demoMode ? <DemoLibrary onClose={onClose} /> : <RealUpload caseId={caseId} onClose={onClose} />}
+        {demoMode || !caseId ? (
+          <DemoLibrary onClose={onClose} only={only} onPick={onPick} />
+        ) : (
+          <RealUpload caseId={caseId} onClose={onClose} />
+        )}
       </div>
     </div>
   );
@@ -41,14 +59,19 @@ function RealUpload({ caseId, onClose }: { caseId: string; onClose: () => void }
   );
 }
 
-function DemoLibrary({ onClose }: { onClose: () => void }) {
+function DemoLibrary({ onClose, only, onPick }: { onClose: () => void; only?: string[]; onPick?: (doc: SampleDoc) => void }) {
   const [camera, setCamera] = useState(false);
   const [scanning, setScanning] = useState<SampleDoc | null>(null);
   const router = useRouter();
-  const docs = availableSampleDocs();
-  const inFrame = cameraDoc();
+  const docs = availableSampleDocs().filter((d) => !only || only.includes(d.id));
+  const inFrame = cameraDoc(docs) ?? docs[0] ?? null;
 
   function pick(doc: SampleDoc) {
+    if (onPick) {
+      onPick(doc);
+      onClose();
+      return;
+    }
     // Scanning animation, then into the right walkthrough. No upload.
     setScanning(doc);
     setTimeout(() => {
@@ -82,7 +105,7 @@ function DemoLibrary({ onClose }: { onClose: () => void }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={inFrame.image} alt="" />
           ) : (
-            <p>No sample bill to photograph yet. It arrives with the bill review walkthrough.</p>
+            <p>Point the camera at your document.</p>
           )}
           <div className="viewfinder-frame" aria-hidden="true" />
         </div>
@@ -119,8 +142,7 @@ function DemoLibrary({ onClose }: { onClose: () => void }) {
         </div>
       ) : (
         <p className="lede">
-          No sample documents yet. Luis&apos;s bills and Tasha&apos;s denial letter arrive with the bill review and
-          denial walkthroughs.
+          No sample documents here.
         </p>
       )}
       <p className="sheet-note">This is a demo: only made-up sample documents are shown, and nothing is uploaded.</p>

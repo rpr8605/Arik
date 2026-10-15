@@ -45,6 +45,7 @@ import { supabaseAdmin } from './supabaseAdmin';
 import { consumeRateLimit } from './rateLimit';
 import { getCaseSample, listSampleCases, openSampleCase, resetSampleSession, touchSampleCase } from './demo/sampleCases';
 import { isDemoMode } from './demo/samples';
+import { loadRxOptions } from './demo/rxOptions';
 
 export const apiDeps = {
   getUserId,
@@ -89,6 +90,8 @@ export const apiDeps = {
   listSampleCases,
   openSampleCase,
   resetSampleSession,
+  // Demo walkthrough Flow 1: real prices for a sample patient (read-only).
+  loadRxOptions,
 };
 
 export function unauthorized() {

@@ -382,6 +382,7 @@ export function Thread({
           document-vault decisions (encryption at rest, access controls,
           data-handling policy) are made — a card photo is PHI on capture.
         */}
+        {demoMode ? null : (
         <button
           type="button"
           aria-disabled="true"
@@ -396,6 +397,7 @@ export function Thread({
             <path d="M5 10a7 7 0 0 0 14 0M12 19v3" />
           </svg>
         </button>
+        )}
         <button
           type="button"
           aria-label={demoMode ? 'Add a sample document' : 'Add a document or photo'}

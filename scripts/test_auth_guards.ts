@@ -32,6 +32,7 @@ import { GET as healthGet } from '../app/api/health/route';
 import { POST as purgePost } from '../app/api/jobs/purge-expired-uploads/route';
 import { GET as samplesGet, POST as samplesPost } from '../app/api/demo/samples/route';
 import { POST as samplesResetPost } from '../app/api/demo/samples/reset/route';
+import { GET as rxGet } from '../app/api/demo/rx/route';
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = '') {
@@ -460,6 +461,29 @@ async function demoSamples() {
     const res = await samplesPost(fakeReq({ body: { sid: SID, key: 'maria' } }));
     restore();
     check('samples POST: rate limited on its own samples budget -> 429', res.status === 429 && limiterRoute === 'samples', `status ${res.status}, route ${limiterRoute}`);
+  }
+  await expect401('demo rx GET: unauthenticated -> 401', () => rxGet(fakeReq({ url: 'http://localhost/api/demo/rx?drug=Eliquis&patient=maria' })));
+  {
+    let loaded = false;
+    stub({ ...asA, isDemoMode: () => false, loadRxOptions: (async () => { loaded = true; return {}; }) as any });
+    const res = await rxGet(fakeReq({ url: 'http://localhost/api/demo/rx?drug=Eliquis&patient=maria' }));
+    restore();
+    check('demo rx GET: DEMO_MODE off -> 404, nothing loaded', res.status === 404 && !loaded, `status ${res.status}`);
+  }
+  {
+    let loaded = false;
+    stub({ ...asA, ...demoOn, loadRxOptions: (async () => { loaded = true; return {}; }) as any });
+    const bad = await rxGet(fakeReq({ url: 'http://localhost/api/demo/rx?drug=Tylenol&patient=maria' }));
+    const who = await rxGet(fakeReq({ url: 'http://localhost/api/demo/rx?drug=Eliquis&patient=nobody' }));
+    restore();
+    check('demo rx GET: unknown drug or patient -> 400, nothing loaded', bad.status === 400 && who.status === 400 && !loaded, `${bad.status}/${who.status}`);
+  }
+  {
+    let seen: any = null;
+    stub({ ...asA, ...demoOn, loadRxOptions: (async (drug: string, sample: any) => { seen = { drug, key: sample.key }; return { drug, found: true }; }) as any });
+    const res = await rxGet(fakeReq({ url: 'http://localhost/api/demo/rx?drug=Eliquis&patient=james' }));
+    restore();
+    check("demo rx GET: loads the sample patient's situation (James -> Rose on Medicare)", res.status === 200 && seen?.drug === 'Eliquis' && seen?.key === 'james', JSON.stringify(seen));
   }
   {
     let limiter = false;

@@ -69,6 +69,15 @@ const STARTERS: Starter[] = [
   },
 ];
 
+// DEMO_MODE: every starter opens its scripted walkthrough
+// (docs/kimi/DEMO_WALKTHROUGHS.md); nothing says "coming soon".
+const DEMO_ROUTES: Record<string, string> = {
+  rx: '/walk/rx',
+  bill: '/walk/bill',
+  denial: '/walk/denial',
+  sample: '/samples',
+};
+
 // Real-drug strip: the verified, sourced drugs.
 const SUGGESTED: {
   drug: string;
@@ -159,6 +168,10 @@ export function NewCaseForm({
 
   return (
     <>
+      <p className="welcome-what">
+        Arik is an AI patient advocate. It finds the lowest legal price for your medicine and helps you fight
+        medical bills and insurance denials.
+      </p>
       <div className="bubble bubble-arik">
         <p>{intro}</p>
         <p>Tell me what&apos;s going on, or tap one to start.</p>
@@ -173,8 +186,8 @@ export function NewCaseForm({
             style={{ animationDelay: `${120 + i * 70}ms` }}
             disabled={busy}
             onClick={() =>
-              s.id === 'sample' && demoMode
-                ? router.push('/samples')
+              demoMode
+                ? router.push(DEMO_ROUTES[s.id])
                 : s.message
                   ? start(s.message, null)
                   : setSoon(s.id)

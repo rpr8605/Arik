@@ -3,9 +3,10 @@
 // ever shows these fictional documents; the real file picker and camera
 // are never opened, nothing is uploaded and nothing is written to storage.
 //
-// A document shows only once its image exists (image !== null). The
-// images and their flows are added in stage 3 (Luis's bills) and stage 4
-// (Tasha's denial); until then they stay hidden, never broken.
+// A document shows only once its image exists (image !== null) and it leads
+// somewhere; anything missing stays hidden, never broken. The images are
+// generated SVGs in public/demo/docs (fictional names, SAMPLE watermark,
+// code numbers only, no CPT descriptor text).
 // Pure; tested by scripts/test_demo_samples.ts.
 
 export interface SampleDoc {
@@ -20,12 +21,12 @@ export interface SampleDoc {
 }
 
 export const SAMPLE_DOCS: SampleDoc[] = [
-  { id: 'luis-hospital-bill', title: 'Luis: hospital bill', owner: 'luis', kind: 'hospital_bill', image: null, flow: null },
-  { id: 'luis-doctor-bill', title: 'Luis: doctor bill', owner: 'luis', kind: 'doctor_bill', image: null, flow: null },
-  { id: 'tasha-denial-letter', title: 'Tasha: denial letter', owner: 'tasha', kind: 'denial_letter', image: null, flow: null },
-  { id: 'tasha-eob', title: 'Tasha: explanation of benefits', owner: 'tasha', kind: 'eob', image: null, flow: null },
-  { id: 'sample-pharmacy-receipt', title: 'Pharmacy receipt', owner: 'any', kind: 'pharmacy_receipt', image: null, flow: null },
-  { id: 'sample-insurance-card', title: 'Insurance card', owner: 'any', kind: 'insurance_card', image: null, flow: null },
+  { id: 'luis-hospital-bill', title: 'Luis: hospital bill', owner: 'luis', kind: 'hospital_bill', image: '/demo/docs/luis-hospital-bill.svg', flow: '/walk/bill' },
+  { id: 'luis-doctor-bill', title: 'Luis: doctor bill', owner: 'luis', kind: 'doctor_bill', image: '/demo/docs/luis-doctor-bill.svg', flow: '/walk/bill' },
+  { id: 'tasha-denial-letter', title: 'Tasha: denial letter', owner: 'tasha', kind: 'denial_letter', image: '/demo/docs/tasha-denial-letter.svg', flow: '/walk/denial' },
+  { id: 'tasha-eob', title: 'Tasha: explanation of benefits', owner: 'tasha', kind: 'eob', image: '/demo/docs/tasha-eob.svg', flow: '/walk/denial' },
+  { id: 'sample-pharmacy-receipt', title: 'Maria: prescription label', owner: 'any', kind: 'pharmacy_receipt', image: '/demo/docs/maria-rx-label.svg', flow: '/walk/rx?patient=maria&drug=Eliquis' },
+  { id: 'sample-insurance-card', title: 'Tasha: insurance card', owner: 'any', kind: 'insurance_card', image: '/demo/docs/tasha-insurance-card.svg', flow: '/walk/denial' },
 ];
 
 // Only documents that exist and lead somewhere are shown.

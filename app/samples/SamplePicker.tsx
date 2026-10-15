@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { sampleSessionId } from '../sampleSession';
+import { clearDemoJobs } from '../walk/demoJobs';
 
 type Row = { key: string; name: string; headline: string; shows: string; caseId: string | null };
 
@@ -29,33 +30,18 @@ export function SamplePicker() {
       setRows(json.samples);
       setLabel(json.label);
     } catch {
-      setError("Couldn't load the sample patients. Try again.");
+      setError('Something hiccuped. Tap Reset or reload to try again.');
     }
   }
   useEffect(() => {
     load();
   }, []);
 
-  async function open(row: Row) {
-    if (row.caseId) {
-      router.push(`/cases/${row.caseId}`);
-      return;
-    }
+  // Each sample opens its patient home (DEMO_WALKTHROUGHS Flow 4); the
+  // home has "Chat with Arik", which makes this tab's chat copy.
+  function open(row: Row) {
     setBusy(row.key);
-    setError(null);
-    try {
-      const res = await fetch('/api/demo/samples', {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify({ sid: sampleSessionId(), key: row.key }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
-      router.push(`/cases/${json.caseId}`);
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(null);
-    }
+    router.push(`/samples/${row.key}`);
   }
 
   return (
@@ -78,7 +64,7 @@ export function SamplePicker() {
               <span>{r.headline}</span>
               <span className="sample-shows">Shows: {r.shows}</span>
             </span>
-            <span className="tag">{busy === r.key ? 'Opening…' : r.caseId ? 'Open' : label}</span>
+            <span className="tag">{busy === r.key ? 'Opening…' : label}</span>
           </button>
         ))}
         {rows === null && !error ? <p className="lede">Loading…</p> : null}
@@ -103,6 +89,7 @@ export function SampleResetButton({ onDone, redirectTo }: { onDone?: () => void;
         body: JSON.stringify({ sid: sampleSessionId() }),
       });
       if (!res.ok) throw new Error(String(res.status));
+      clearDemoJobs();
       setState('done');
       if (redirectTo) router.push(redirectTo);
       onDone?.();
