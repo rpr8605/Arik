@@ -38,14 +38,34 @@ Every recommendation is a **legal savings mechanism** with a citable source
 If a mechanism can't be cited to a real source, it doesn't ship as a
 recommendation. Aggressive tone is fine. Unsupported claims are not.
 
-## Phase 1 (this repo, right now)
+## What runs today (this repo, 2026-10)
 
-This repo is a complete specification, not a runnable app - schema, seed
-data, one example API route, and design docs. The authoritative build
-sequence (core case-model infrastructure, then Phase 1 drug pricing, then
-the Phase 1.5 bill-auditor track) is in `HANDOFF.md`; start there. The
-monitor job described above is a later-phase concern, not part of the
-Phase 1 pilot.
+A working Next.js 16 app on a Supabase Postgres database, demo-ready
+(stage S1 in `ARIK_MASTER_SPEC.md`):
+
+- Case-scoped drug-cost chat: a cheap model extracts the facts, plain
+  database queries retrieve programs and prices, a deterministic ranking
+  engine picks the cheapest 3-12 month path, and the response model only
+  writes the explanation. Code checks every figure against the retrieved
+  data and builds the source receipt; empty retrieval gets a fixed
+  "no data" answer.
+- Medicare/Medicaid copay-card hard-block, state accumulator-law data,
+  crisis-aware behavior, English/Spanish.
+- Cases with a status workflow, deadlines and outcome confirmation;
+  caregiver mode; document upload (PDF/image/HEIC); encrypted identity;
+  consent ledger; full deletion and scheduled purges.
+- Pricing ingestion with a NADAC benchmark adapter and consent/staleness
+  gates; session auth and ownership checks on every API route.
+
+Not built yet: bill review, the denial engine, letters, the Arik Agent,
+insurance profiles and the monitor job described above. Not cleared for
+real patient data until the S4 security gate passes.
+
+Where to look: `AGENTS.md` (how to work in the repo, commands, current
+status of every module), `ARIK_MASTER_SPEC.md` (modules, acceptance
+criteria, stages), `docs/status/` (completeness audits),
+`docs/kimi/RUN_ORDER.md` (the order of upcoming work). `HANDOFF.md` is the
+original build index.
 
 ## The full vision (beyond drug pricing)
 

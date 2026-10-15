@@ -11,3 +11,7 @@ tsconfig.tsbuildinfo
 .env.remote.backup
 
 supabase/.temp/
+
+# Local-only files (never commit)
+dev-server.err.log
+scripts/dogfood_profile_run.mjs

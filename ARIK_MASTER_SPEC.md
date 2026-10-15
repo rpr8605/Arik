@@ -129,7 +129,7 @@ Caregiver manages a family member's cases with an authorization on file (CAREGIV
 
 | Layer | Today | Target |
 | --- | --- | --- |
-| UI | Next.js 16 App Router, chat-first, case list home | Same; add approval screens, receipts, insurance profile, letters |
+| UI | Next.js 16 App Router, chat-first, case list home | Same; add approval screens, receipts, insurance profile, letters; installable web app, then App Store and Google Play apps wrapping the same UI (M23) |
 | API | Next.js route handlers in `app/api/` | Same; every route session-guarded |
 | Decision engines | `lib/ranking.ts`, `lib/medicareEligibility.ts`, `lib/deadlines.ts`, `lib/mtm.ts` | Add `lib/rules/` (denials, bills), `lib/pricing/` (ingest) |
 | AI layer | `lib/callModel.ts` → OpenRouter (Haiku extraction, Sonnet 4.6 response) | Provider interface: OpenRouter for local dev; BAA-covered provider (Anthropic direct or AWS Bedrock) for patient data; Sonnet 5.5 after evals pass |
@@ -512,6 +512,27 @@ Phased: v1 (S3) prepares and tracks, nothing leaves the system; v2 (S5) sends fo
 
 **Status:** AC1 PARTIAL (suites exist, no single command). Others MISSING.
 
+### M23. Mobile: installable web app and store apps
+
+**Purpose:** put Arik on patients' phones without rebuilding it. The web app stays the single product. First it becomes installable (a progressive web app). After the pilot, the same app is wrapped with Capacitor for the Apple App Store and Google Play.
+**Existing:** chat-first Next.js UI, camera capture in document intake, in-app account deletion (M18-AC5).
+**Build requirements:**
+- One codebase. No native rewrite.
+- The store apps load the hosted Arik app and add phone features through Capacitor plugins.
+- Notifications never contain patient details (no drug names, amounts, diagnoses or insurer names). For example: "You have an update in Arik."
+- Nothing with patient data is cached for offline use.
+
+| ID | Criterion | Stage |
+| --- | --- | --- |
+| M23-AC1 | Installable web app: web app manifest, icons, standalone display, service worker with an offline screen that holds no patient data; passes the browser's installability check on iPhone and Android | S4 |
+| M23-AC2 | Deadline reminders by web push, opt-in with consent recorded in `consent_ledger`; notification text contains no patient details (test) | S4 |
+| M23-AC3 | Capacitor iOS and Android projects wrapping the hosted app; builds reproducible from the repo; app points only at the production domain | S6 |
+| M23-AC4 | Phone features that make it more than a website: native camera bill and EOB capture feeding M09 intake, native push for deadlines (same no-details rule), Face ID / fingerprint unlock | S6 |
+| M23-AC5 | Store readiness: privacy policy and terms linked in app; account deletion reachable in app; privacy labels and data-safety answers documented in the repo; Sign in with Apple added if any third-party sign-in is offered; store listing text and screenshots | S6 |
+| M23-AC6 | Payments decision documented before any in-app purchase: current Apple and Google rules for subscriptions, whether to link out to web checkout, and employer-paid accounts as the default path (blocked on M19) | S7 |
+
+**Status:** all MISSING.
+
 ---
 
 ## 6. Stages and gates
@@ -521,9 +542,9 @@ Phased: v1 (S3) prepares and tracks, nothing leaves the system; v2 (S5) sends fo
 | S1 | Demo-ready | Arik runs locally, secured, with a recorded walkthrough | M01-AC1 to AC6, M02-AC1 to AC4, M03-AC1, M04-AC1/3/4/7, M05-AC1/2, M07-AC7, M17-AC1, M20-AC1/2, M22-AC1/4 |
 | S2 | Partner-ready | Any pricing partner plugs in with a small adapter | All S2 criteria in M05, M06, M07 |
 | S3 | Denials and bills v1 | Upload-based denial engine, bill review and letters; Arik Agent v1 (prep and track) | All S3 criteria in M03, M04, M09, M10, M11, M12, M16, M18-AC1 |
-| S4 | Pilot-ready | Safe for real patient data on AWS | All S4 criteria (M01, M02, M04-AC2, M09, M18, M20, M21, M22) |
+| S4 | Pilot-ready | Safe for real patient data on AWS; installable on phones | All S4 criteria (M01, M02, M04-AC2, M09, M18, M20, M21, M22, M23) |
 | S5 | Acts for you + insurance | Action framework, insurance profile, knowledge base | All S5 criteria |
-| S6 | Connected | Record connections, formulary match, Price Integrity Loop | All S6 criteria |
+| S6 | Connected | Record connections, formulary match, Price Integrity Loop, App Store and Google Play apps | All S6 criteria |
 | S7 | Business-ready | Fees, guarantee, employer plans, browser actions | All S7 criteria |
 
 Stages S2 and S3 can run in parallel after S1. S4 must pass before any real patient data, partner data shown to patients, or record connections.
@@ -545,6 +566,7 @@ Stages S2 and S3 can run in parallel after S1. S4 must pass before any real pati
 - Uploads first; record connections after AWS hosting with BAAs; Flexpa when funded.
 - Target host: AWS under a BAA (infra/aws/README.md).
 - Every letter and the onboarding flow carry the not-legal-advice notices.
+- Mobile: installable web app at the pilot (S4); App Store and Google Play apps via a Capacitor wrapper after the pilot (S6); no native rewrite (M23).
 
 ### 7.2 Open (do not build past these without Ryan)
 
@@ -554,6 +576,8 @@ Stages S2 and S3 can run in parallel after S1. S4 must pass before any real pati
 - AI provider for patient data: Anthropic direct with a BAA, or Claude on AWS Bedrock (confirm model coverage).
 - Mail/fax vendor with a BAA.
 - Counsel review: debt-settlement and adjuster laws before percentage fees or advocate negotiation; privacy policy; terms.
+- Which legal entity lists the store apps (RPR Development LLC or the co-op); Apple organization enrollment needs a D-U-N-S number for that entity.
+- Store payment rules for subscriptions (M23-AC6).
 
 ---
 
