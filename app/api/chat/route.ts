@@ -18,6 +18,7 @@ import { callModel, type ModelUsage } from '@/lib/callModel';
 import { buildAllowedFacts, withGroundingGuard } from '@/lib/groundingGuard';
 import { buildFallbackOptions, buildTrustReceipt } from '@/lib/trustReceipt';
 import { apiDeps, requireUser } from '@/lib/apiAuth';
+import { rateLimitResponse } from '@/lib/rateLimit';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON, isGovernmentInsurance } from '@/lib/medicareEligibility';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
@@ -345,6 +346,11 @@ export async function POST(req: Request) {
   // CONVERSATIONAL_ENTITY_EXTRACTION.md).
   const userId = await requireUser(req);
   if (!userId) return Response.json({ error: 'unauthorized' }, { status: 401 });
+
+  // Rate limits and the demo model budget, before any work (fails closed).
+  const limit = await apiDeps.consumeRateLimit('chat', userId, req);
+  if (!limit.allowed) return rateLimitResponse(limit, req);
+
   const { message, sessionId } = await req.json();
 
   // Ownership gate (M01-AC2, audit fix 2026-10-05): the service-role

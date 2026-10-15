@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { apiDeps, notFound, requireUser, unauthorized } from '@/lib/apiAuth';
+import { rateLimitResponse } from '@/lib/rateLimit';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { mergeExtractedFacts } from '@/lib/extractedFacts';
 import {
@@ -30,6 +31,11 @@ export async function POST(
 ) {
   const userId = await requireUser(req);
   if (!userId) return unauthorized();
+
+  // Rate limits and the demo model budget, before any work (fails closed).
+  const limit = await apiDeps.consumeRateLimit('documents', userId, req);
+  if (!limit.allowed) return rateLimitResponse(limit, req);
+
   const { id: caseId } = await params;
 
   // Owner or caregiver of the managed patient the case belongs to

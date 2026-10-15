@@ -25,7 +25,9 @@ export const ENV_VARS: EnvVar[] = [
   { name: 'NEXT_PUBLIC_SUPABASE_URL', scope: 'public', required: true, purpose: 'Supabase URL for browser and session proxy' },
   { name: 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', scope: 'public', required: true, purpose: 'Publishable (anon) key for browser and session proxy' },
   { name: 'MODEL_TIMEOUT_MS', scope: 'server', required: false, purpose: 'Model call timeout in ms (default 60000)' },
-  { name: 'APP_VERSION', scope: 'server', required: false, purpose: 'Git SHA or release tag reported by /api/health' },
+  { name: 'APP_VERSION', scope: 'server', required: false, purpose: 'Git SHA or release tag reported by /api/health (set automatically from the build commit when unset)' },
+  { name: 'RATE_LIMIT_ANON_DAILY_MODEL_CAP', scope: 'server', required: false, purpose: 'Combined daily model-request cap for all anonymous users (default 200)' },
+  { name: 'RATE_LIMIT_IP_SALT', scope: 'server', required: false, purpose: 'Key for hashing client IPs in rate-limit counters (default: derived from the service-role key)' },
 ];
 
 export function missingEnv(): string[] {

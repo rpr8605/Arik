@@ -41,6 +41,7 @@ import {
 import { getChatProfile, getOwnedChatSession } from './chatSession';
 import { getPendingCorrection } from './extractedFacts';
 import { supabaseAdmin } from './supabaseAdmin';
+import { consumeRateLimit } from './rateLimit';
 
 export const apiDeps = {
   getUserId,
@@ -68,6 +69,9 @@ export const apiDeps = {
   // The corrections route's single-row read; the service client is passed
   // by the default wrapper so tests stub one plain function.
   getPendingCorrection: (id: string) => getPendingCorrection(supabaseAdmin(), id),
+  // Rate limits + demo model budget (lib/rateLimit.ts, db/026). Called
+  // right after requireUser on chat, documents and cases/start.
+  consumeRateLimit,
 };
 
 export function unauthorized() {

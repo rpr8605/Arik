@@ -36,7 +36,12 @@ function check(name: string, cond: boolean, detail = '') {
   if (!cond) failures++;
 }
 
-const ORIGINAL = { ...apiDeps };
+// The rate limiter (db/026) needs a database; by default it is stubbed to
+// "allowed" so every other case tests exactly what it tested before. The
+// rate-limit section at the end stubs it explicitly.
+const ALLOW_ALL = (async () => ({ allowed: true as const })) as typeof apiDeps.consumeRateLimit;
+const ORIGINAL = { ...apiDeps, consumeRateLimit: ALLOW_ALL };
+Object.assign(apiDeps, ORIGINAL);
 function stub(partial: Partial<typeof apiDeps>) {
   Object.assign(apiDeps, partial);
 }
@@ -62,10 +67,11 @@ const asA = { getUserId: async () => A };
 const paramsFor = (id: string) => ({ params: Promise.resolve({ id }) });
 
 async function expect401(name: string, call: () => Promise<Response>) {
-  stub(noSession);
+  let limiterCalled = false;
+  stub({ ...noSession, consumeRateLimit: (async () => { limiterCalled = true; return { allowed: true as const }; }) as any });
   const res = await call();
   restore();
-  check(name, res.status === 401, `status ${res.status}`);
+  check(name, res.status === 401 && !limiterCalled, `status ${res.status}${limiterCalled ? ', limiter called before auth' : ''}`);
 }
 
 async function main() {
@@ -313,6 +319,57 @@ await expect401('cases/start POST: unauthenticated -> 401', () => casesStartPost
 {
   const res = await purgePost(fakeReq());
   check('purge job POST: service-key bearer only, no header -> 401', res.status === 401, `status ${res.status}`);
+}
+
+// --- Rate limits (db/026, lib/rateLimit.ts): order is 401 -> 429/503 ->
+// ownership. A limited caller gets 429 with Retry-After before any data
+// access; a limiter that cannot reach the database fails closed with 503.
+const limited = [
+  { name: 'chat', route: 'chat', call: () => chatPost(fakeReq({ body: { message: 'x', sessionId: 'session-b' } })) },
+  { name: 'documents', route: 'documents', call: () => documentsPost(fakeReq({ formData: true }), paramsFor('c1')) },
+  { name: 'cases/start', route: 'cases_start', call: () => casesStartPost(fakeReq({ body: { message: 'a bill' } })) },
+];
+for (const r of limited) {
+  {
+    let seen: { route: string; uid: string } | null = null;
+    let dataTouched = false;
+    stub({
+      ...asA,
+      consumeRateLimit: (async (route: string, uid: string) => {
+        seen = { route, uid };
+        return { allowed: false, unavailable: false, bucket: `${route}:user:burst`, retryAfterSeconds: 42 };
+      }) as any,
+      getOwnedChatSession: (async () => { dataTouched = true; return null; }) as any,
+      canAccessCase: (async () => { dataTouched = true; return false; }) as any,
+      createCase: (async () => { dataTouched = true; throw new Error('should not run'); }) as any,
+    });
+    const res = await r.call();
+    restore();
+    const body: any = await res.json().catch(() => ({}));
+    const s = seen as { route: string; uid: string } | null;
+    check(
+      `${r.name}: rate limited -> 429 + Retry-After, before any data access`,
+      res.status === 429 && res.headers.get('retry-after') === '42' && body.code === 'rate_limited' && !dataTouched,
+      `status ${res.status}, retry-after ${res.headers.get('retry-after')}, dataTouched ${dataTouched}`,
+    );
+    check(`${r.name}: limiter keyed by session user and route`, s?.uid === A && s?.route === r.route, `saw ${JSON.stringify(s)}`);
+  }
+  {
+    stub({ ...asA, consumeRateLimit: (async () => ({ allowed: false, unavailable: true })) as any });
+    const res = await r.call();
+    restore();
+    check(`${r.name}: limiter unavailable -> 503 (fails closed)`, res.status === 503, `status ${res.status}`);
+  }
+}
+{
+  stub({
+    ...asA,
+    consumeRateLimit: (async () => ({ allowed: false, unavailable: false, bucket: 'model:anon:day', retryAfterSeconds: 3600 })) as any,
+  });
+  const res = await chatPost(fakeReq({ body: { message: 'x', sessionId: 's1' } }));
+  restore();
+  const body: any = await res.json().catch(() => ({}));
+  check('chat: combined anonymous cap -> 429 with the demo-cap message', res.status === 429 && body.limit === 'demo_cap' && /daily limit/.test(body.error), `status ${res.status}, limit ${body.limit}`);
 }
 }
 

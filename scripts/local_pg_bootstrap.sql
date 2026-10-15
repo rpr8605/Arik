@@ -32,6 +32,9 @@ create table if not exists auth.users (
   raw_app_meta_data jsonb default '{}',
   raw_user_meta_data jsonb default '{}'
 );
+-- Supabase auth.users carries is_anonymous (anonymous sign-ins); db/026's
+-- rate limiter reads it.
+alter table auth.users add column if not exists is_anonymous boolean not null default false;
 -- Service-role-only app: RLS predicates evaluate auth.uid() = null for
 -- direct-SQL access, so policies deny by default (the app reads/writes
 -- through the postgres role, which bypasses RLS as table owner - same

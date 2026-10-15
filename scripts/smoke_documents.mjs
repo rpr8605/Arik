@@ -162,6 +162,10 @@ check('png source_format is image_upload', img.json?.document?.source_format ===
 
 // 6. HEIC routing: an invalid HEIC must fail LOUD as a first-class
 //    'failed' row (502), never crash or silently store junk.
+// This is the fixture user's 6th upload inside 10 minutes; db/026 allows 5,
+// so clear its counters first (this smoke tests intake, not rate limits -
+// scripts/smoke_rate_limit.mjs covers those).
+await pgClient.query('delete from rate_limit_counters where subject = $1', [USER]);
 const heic = await upload(Buffer.from('this is not a real heic file'), 'photo.heic', 'image/heic');
 check('invalid heic returns 502 (clean failure)', heic.status === 502, `got ${heic.status}`);
 const heicRow = await docRow(heic.json?.document_id);

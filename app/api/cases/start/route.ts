@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiDeps, requireUser, unauthorized } from '@/lib/apiAuth';
+import { rateLimitResponse } from '@/lib/rateLimit';
 import { type CaseType } from '@/lib/cases';
 import { migrateStagedFactsIntoCase } from '@/lib/extractedFacts';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
@@ -22,6 +23,10 @@ function guessCaseType(text: string): CaseType {
 export async function POST(req: NextRequest) {
   const userId = await requireUser(req);
   if (!userId) return unauthorized();
+
+  // Rate limits (case rows are cheap but unbounded without this; fails closed).
+  const limit = await apiDeps.consumeRateLimit('cases_start', userId, req);
+  if (!limit.allowed) return rateLimitResponse(limit, req);
 
   const body = await req.json();
   const message = typeof body.message === 'string' ? body.message.trim() : '';
