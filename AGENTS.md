@@ -68,8 +68,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/020_conflict_classes.sql` → `db/021_explanation_style_and_support_phone.sql`
 → `db/022_pricing_ingestion.sql` →
 `db/023_price_sources_defaults_false.sql` → `db/024_nadac_displayable.sql`
-→ `db/025_pharmacies_ingest_runs.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–025
+→ `db/025_pharmacies_ingest_runs.sql` → `db/026_rate_limits.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–026
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -215,6 +215,26 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     heic-convert server-side, magic-byte image sniffing, 25MB cap.
     Screening is type/size only — malware scanning is a known deferred
     gap, do not close it accidentally.
+  - `rateLimit.ts` — rate limits + public-demo model budget (2026-10-14,
+    M01-AC7 moved up from S4). The limit table is pure (tested by
+    `scripts/test_rate_limit.ts`); counting is one atomic all-or-nothing
+    SQL function, `consume_rate_limits()` in db/026, which reads
+    `auth.users.is_anonymous` itself. Per-user + per-IP (keyed hash, never
+    the raw IP) + ONE combined daily cap for all anonymous users (default
+    200 model requests, `RATE_LIMIT_ANON_DAILY_MODEL_CAP`) — per-user caps
+    alone are dodged by clearing cookies, since proxy.ts mints a new
+    anonymous user per cookieless visit. Applied via `apiDeps` on chat,
+    documents and cases/start (401 → 429/503 → ownership). **Fails closed
+    (503)**, so db/026 must be applied to a database BEFORE code that calls
+    it is deployed there. `scripts/smoke_rate_limit.mjs` proves the SQL
+    against the local stack.
+  - `securityHeaders.ts` — CSP/HSTS/frame/nosniff/referrer/permissions
+    headers, built in `next.config.ts` (tested by
+    `scripts/test_security_headers.ts`). CSP keeps `'unsafe-inline'` for
+    Next hydration + next/font; a nonce CSP is the S4 follow-up.
+    `connect-src` allows only this app and `NEXT_PUBLIC_SUPABASE_URL`.
+    `APP_VERSION` is fixed at build from APP_VERSION → VERCEL_GIT_COMMIT_SHA
+    → local git, so `/api/health` shows the deployed commit.
   - `supabaseAdmin.ts` — lazy service-role client; server-only.
   - `supabaseBrowser.ts` — publishable-key browser client; client comps.
   - `session.ts` — `getUserId(req)`: Bearer JWT or cookie session →

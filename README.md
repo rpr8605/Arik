@@ -64,7 +64,7 @@ real patient data until the S4 security gate passes.
 Where to look: `AGENTS.md` (how to work in the repo, commands, current
 status of every module), `ARIK_MASTER_SPEC.md` (modules, acceptance
 criteria, stages), `docs/status/` (completeness audits),
-`docs/kimi/RUN_ORDER.md` (the order of upcoming work). `HANDOFF.md` is the
+`docs/kimi/` (the run order for upcoming work and the build prompts). `HANDOFF.md` is the
 original build index.
 
 ## The full vision (beyond drug pricing)
