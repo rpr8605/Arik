@@ -72,18 +72,61 @@ body {
   z-index: 1;
 }
 
-/* Mobile-first: full-width, edge-to-edge padding below 640px.
-   640px and up: the app panel constrains to 600px and centers — a
-   tablet-width app view on desktop, never a site that keeps stretching. */
+/* Mobile-first: full-width, edge-to-edge padding. The app is always laid
+   out at phone width: on real phones it fills the screen, and from 600px
+   wide it renders inside the phone frame below, so the old 600px desktop
+   panel rule is gone (2026-10-14). */
 main {
   width: 100%;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 4rem;
 }
-@media (min-width: 640px) {
-  main {
-    max-width: 600px;
-    padding: 3rem 1.5rem 5rem;
+
+/* Phone frame (2026-10-14 demo ticket). Below 600px .device and
+   .device-screen are plain blocks: no frame, full screen, page scroll as
+   before. From 600px (tablet and desktop) the page becomes a fixed stage
+   showing the gradient and glow blobs, and the app sits in a centered
+   ~400x820 phone frame with a thin dark bezel and its own scroll. The
+   frame shrinks with short windows so it always fits. */
+@media (min-width: 600px) {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .device {
+    flex: none;
+    width: 400px;
+    height: 820px;
+    max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
+    padding: 10px;
+    border-radius: 52px;
+    background: #16263a;
+    box-shadow:
+      0 30px 70px rgba(31, 61, 90, 0.28),
+      0 8px 20px rgba(31, 61, 90, 0.16),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .device-screen {
+    width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    border-radius: 42px;
+    background: linear-gradient(160deg, #eaf6fb 0%, #fafbfc 45%, #eaf9f4 100%);
+    /* Anything position:fixed inside the app is pinned to the frame, not
+       the browser window. */
+    transform: translateZ(0);
   }
 }
 

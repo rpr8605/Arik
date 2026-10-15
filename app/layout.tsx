@@ -20,16 +20,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             during scroll); content sits above them via .app-shell. */}
         <div className="glow glow-sky" aria-hidden="true" />
         <div className="glow glow-emerald" aria-hidden="true" />
-        <div className="app-shell">
-          <div
-            role="note"
-            style={{ background: '#fff3cd', padding: '0.5rem 1rem', fontSize: '0.9rem', textAlign: 'center' }}
-          >
-            Demo build — you&apos;re on a temporary session (no sign-up needed), and anything you
-            enter here may be deleted at any time without warning. Don&apos;t rely on coming back to a
-            saved case or saved results.
+        {/* Phone frame (2026-10-14 demo ticket): from 600px wide the whole
+            app, banner included, renders inside a centered phone-shaped
+            frame and scrolls inside it (globals.css .device). On phones
+            both wrappers are plain blocks and the app is full screen. */}
+        <div className="device app-shell">
+          <div className="device-screen">
+            <div
+              role="note"
+              style={{ background: '#fff3cd', padding: '0.5rem 1rem', fontSize: '0.9rem', textAlign: 'center' }}
+            >
+              Demo build — you&apos;re on a temporary session (no sign-up needed), and anything you
+              enter here may be deleted at any time without warning. Don&apos;t rely on coming back to a
+              saved case or saved results.
+            </div>
+            {children}
           </div>
-          {children}
         </div>
       </body>
     </html>
