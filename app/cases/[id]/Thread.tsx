@@ -96,11 +96,11 @@ function AssistantMessage({
           )}
         </div>
       ))}
-      <div style={{ marginTop: '0.4rem', fontSize: '0.92em' }}>
-        <button type="button" onClick={() => onRecovery('dont_know')}>I don&apos;t know</button>{' '}
-        <button type="button" onClick={() => router.push('/')}>Start over</button>{' '}
+      <div className="actions" style={{ fontSize: '0.92em' }}>
+        <button type="button" onClick={() => onRecovery('dont_know')}>I don&apos;t know</button>
+        <button type="button" onClick={() => router.push('/')}>Start over</button>
         {programPhone ? (
-          <a href={`tel:${programPhone.replace(/[^0-9+]/g, '')}`} style={{ textDecoration: 'underline' }}>
+          <a className="pill-link" href={`tel:${programPhone.replace(/[^0-9+]/g, '')}`}>
             Call the program: {programPhone}
           </a>
         ) : null}
@@ -136,6 +136,36 @@ export function Thread({
   const [programPhone, setProgramPhone] = useState<string | null>(null);
   const [comingSoon, setComingSoon] = useState<string | null>(null);
   const sentFirst = useRef(false);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  // Mobile-ready pass (2026-10-14): keep the newest message in view, after
+  // every new message and when the keyboard opens.
+  const scrollToLatest = () => endRef.current?.scrollIntoView({ block: 'end' });
+  useEffect(() => {
+    scrollToLatest();
+  }, [messages.length, busy]);
+
+  // iOS Safari lays the keyboard OVER the page instead of resizing it, so
+  // the sticky composer would sit under it. The visual viewport says how
+  // much is covered; globals.css lifts .composer by --kb-inset. (Android
+  // Chrome resizes the page itself, so the inset stays 0 there.)
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      root.style.setProperty('--kb-inset', `${inset}px`);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      root.style.removeProperty('--kb-inset');
+    };
+  }, []);
 
   async function send(text: string) {
     setBusy(true);
@@ -228,8 +258,10 @@ export function Thread({
           </div>
         ))}
         {busy && <p>Arik is working…</p>}
+        <div ref={endRef} className="chat-end" />
       </div>
       <form
+        className="composer"
         onSubmit={(e) => {
           e.preventDefault();
           if (!input.trim() || busy) return;
@@ -255,7 +287,8 @@ export function Thread({
           aria-label="Voice input — coming soon"
           title="Voice input — coming soon"
           onClick={() => setComingSoon('Voice input — coming soon')}
-          style={{ opacity: 0.5, cursor: 'default', marginRight: '0.25rem' }}
+          className="icon-btn"
+          style={{ opacity: 0.5, cursor: 'default' }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="9" y="2" width="6" height="12" rx="3" />
@@ -268,7 +301,8 @@ export function Thread({
           aria-label="Document or photo upload — coming soon"
           title="Document or photo upload — coming soon"
           onClick={() => setComingSoon('Document or photo upload — coming soon')}
-          style={{ opacity: 0.5, cursor: 'default', marginRight: '0.5rem' }}
+          className="icon-btn"
+          style={{ opacity: 0.5, cursor: 'default' }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
@@ -281,11 +315,13 @@ export function Thread({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Reply…"
           disabled={busy}
-          style={{ width: '100%', maxWidth: '40rem' }}
+          enterKeyHint="send"
+          autoComplete="off"
+          onFocus={() => setTimeout(scrollToLatest, 350)}
         />
         <button type="submit" disabled={busy}>Send</button>
-        {comingSoon ? <span style={{ marginLeft: '0.5rem', fontSize: '0.9em' }}>{comingSoon}</span> : null}
       </form>
+      {comingSoon ? <p style={{ fontSize: '0.9em', margin: '0.25rem 0 0' }}>{comingSoon}</p> : null}
       {error && <p role="alert">{error}</p>}
     </section>
   );

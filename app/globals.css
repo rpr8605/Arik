@@ -35,6 +35,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: linear-gradient(160deg, #eaf6fb 0%, #fafbfc 45%, #eaf9f4 100%) fixed;
   color: var(--arik-ink);
   font-family: var(--font-source-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -78,17 +79,45 @@ body {
    panel rule is gone (2026-10-14). */
 main {
   width: 100%;
+  max-width: 640px;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 4rem;
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+  /* + --kb-inset: on iOS the keyboard covers the page instead of resizing
+     it, so this is the room the newest message needs to scroll up above
+     the raised chat box (0 when no keyboard, and on every other page). */
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom) + var(--kb-inset, 0px));
 }
 
-/* Phone frame (2026-10-14 demo ticket). Below 600px .device and
+/* Mobile-ready pass (2026-10-14). viewport-fit=cover (layout.tsx) lets the
+   app draw edge to edge; these keep content clear of the notch, the
+   rounded corners and the home bar. Long words, codes and URLs wrap
+   instead of pushing the page sideways at 360px. */
+.device-screen > [role="note"] {
+  padding-top: max(0.5rem, env(safe-area-inset-top)) !important;
+  padding-left: max(1rem, env(safe-area-inset-left)) !important;
+  padding-right: max(1rem, env(safe-area-inset-right)) !important;
+}
+main,
+.md {
+  overflow-wrap: anywhere;
+}
+input,
+select,
+textarea {
+  /* 16px or more: iOS Safari zooms the page into smaller inputs. */
+  font-size: max(16px, 1em);
+}
+
+/* Phone frame (2026-10-14 demo ticket). Below 600px wide, or under 500px
+   tall (a phone in landscape), .device and
    .device-screen are plain blocks: no frame, full screen, page scroll as
    before. From 600px (tablet and desktop) the page becomes a fixed stage
    showing the gradient and glow blobs, and the app sits in a centered
    ~400x820 phone frame with a thin dark bezel and its own scroll. The
    frame shrinks with short windows so it always fits. */
-@media (min-width: 600px) {
+@media (min-width: 600px) and (min-height: 500px) {
   html,
   body {
     height: 100%;
@@ -455,4 +484,83 @@ button.chip:hover:not(:disabled) {
 .md a {
   color: var(--arik-brand-dark);
   overflow-wrap: anywhere;
+}
+
+/* Chat composer: stays at the bottom of the scroll area and above the
+   on-screen keyboard. --kb-inset is set by Thread.tsx from the visual
+   viewport (iOS Safari covers the page with the keyboard instead of
+   resizing it); Android Chrome resizes the page itself
+   (interactive-widget=resizes-content in layout.tsx), so it stays 0 there. */
+.composer {
+  position: sticky;
+  bottom: var(--kb-inset, 0px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem -0.5rem 0;
+  padding: 0.6rem 0.5rem calc(0.6rem + env(safe-area-inset-bottom));
+  background: var(--arik-card);
+  border-top: 1px solid var(--arik-border);
+}
+.composer input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.composer button[type="submit"] {
+  min-height: 48px;
+  padding: 0.5rem 1rem;
+}
+.composer .icon-btn {
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+/* Scrolling to the newest message stops ABOVE the sticky composer, not
+   behind it (seen in landscape with the keyboard open). */
+.chat-end {
+  scroll-margin-bottom: calc(5.5rem + var(--kb-inset, 0px) + env(safe-area-inset-bottom));
+}
+
+/* Standalone action links (Call the program) are pill-sized tap targets,
+   not inline text. */
+a.pill-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--arik-brand);
+  background: var(--arik-brand-tint);
+  font-weight: 600;
+  font-family: var(--font-outfit), var(--font-source-sans), sans-serif;
+  text-decoration: none;
+}
+
+/* Buttons in a row keep a finger's width apart. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Phones: the two placeholder "coming soon" icons would squeeze the reply
+   box to a few letters, so they step aside until voice and upload actually
+   work, and cards use a little less padding so the text gets the width. */
+@media (max-width: 479px) {
+  .composer .icon-btn {
+    display: none;
+  }
+  section[aria-label],
+  .card {
+    padding: 1.1rem;
+  }
 }

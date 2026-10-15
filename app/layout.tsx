@@ -1,4 +1,5 @@
 import './globals.css';
+import type { Viewport } from 'next';
 import { Outfit, Source_Sans_3 } from 'next/font/google';
 
 // Brand fonts (2026-08-13 ticket): Outfit for headings, Source Sans 3
@@ -10,6 +11,18 @@ const sourceSans = Source_Sans_3({ subsets: ['latin'], variable: '--font-source-
 export const metadata = {
   title: 'Arik',
   description: 'Patient-side healthcare cost advocate',
+};
+
+// Mobile-ready pass (2026-10-14): draw under the notch and home bar
+// (globals.css pads with env(safe-area-inset-*)), and let Android Chrome
+// shrink the page when the keyboard opens so the chat box stays visible.
+// Pinch-zoom is left on (no maximumScale) for accessibility.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+  themeColor: '#eaf6fb',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

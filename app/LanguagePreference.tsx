@@ -16,15 +16,22 @@ export function LanguagePreference() {
 
   useEffect(() => {
     (async () => {
-      const {
-        data: { session },
-      } = await supabaseBrowser().auth.getSession();
-      const res = await fetch('/api/preferences', {
-        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setLang(json.preferred_language === 'es' ? 'es' : 'en');
+      // A dropped or cancelled request (flaky phone connection, navigating
+      // away mid-load) leaves the default language showing instead of
+      // throwing an unhandled error.
+      try {
+        const {
+          data: { session },
+        } = await supabaseBrowser().auth.getSession();
+        const res = await fetch('/api/preferences', {
+          headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setLang(json.preferred_language === 'es' ? 'es' : 'en');
+        }
+      } catch {
+        // keep the default
       }
     })();
   }, []);
