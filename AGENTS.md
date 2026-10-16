@@ -519,13 +519,17 @@ create-extension lines locally), `db_reset.mjs` + `db_check.mjs` (the
   calls need `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
   `IDENTITY_ENCRYPTION_KEY` (app-held pgcrypto passphrase — losing it
   makes identity data unrecoverable).
-- `npm audit` reports 3 high-severity findings in Next's transitive
-  postcss/sharp deps; `npm audit fix --force` would downgrade Next to 9.x
-  — do NOT run it. Accepted for the pilot (build-time only, no custom
-  CSS, no self-hosted image optimization); revisit before production.
-- `pdfjs-dist` must stay on 5.6.205 — pdf-to-img bundles that exact
-  version and pdfjs throws "API version does not match Worker version"
-  otherwise. Keep them deduped.
+- `npm audit`: 0 findings as of 2026-10-16, after upgrading next
+  16.2.11 -> 16.3.8 (critical RCE advisories GHSA-p293-qw3h-jr36,
+  GHSA-2xp9-vwfh-vxw4, GHSA-vcvr-r3jv-pc5j and others, all < 16.3.8) and
+  pdf-to-img 6.2.0 -> 7.0.0 with pdfjs-dist 5.6.205 -> 6.2.108 (malicious
+  PDF JavaScript execution, GHSA-hq66-cqwq-w95j, < 6.2.108). Re-run
+  `npm audit` before every deploy; never `npm audit fix --force`.
+- `pdfjs-dist` must match the version pdf-to-img depends on (6.2.108 for
+  pdf-to-img 7.0.0); pdfjs throws "API version does not match Worker
+  version" otherwise. Keep them deduped (`npm ls pdfjs-dist`).
+- OCR: `tesseract.js` 7.0.0 with `@tesseract.js-data/eng` 1.0.0 (the
+  English data ships in node_modules; no download at run time).
 - pdfjs `standardFontDataUrl` needs a real fs path with a trailing
   FORWARD slash (Turbopack's require.resolve returns a virtual
   "[externals]" path; use process.cwd() + node_modules, see
@@ -575,3 +579,13 @@ create-extension lines locally), `db_reset.mjs` + `db_check.mjs` (the
   judgment, inferred diagnoses) never built, not even as a disabled path.
 - The `exploits` database is the actual asset; the frontend is disposable
   and re-skinnable per vertical against the same/forked Supabase instance.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
