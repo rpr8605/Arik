@@ -67,7 +67,7 @@ export interface RankingResult {
 // Shallow eligibility matcher — DELIBERATELY minimal until the fold's full
 // criteria vocabulary lands. Anything it can't evaluate becomes a note,
 // never an assumption.
-function eligibilityNotes(e: any, p: RankingPatient): { viable: boolean; notes: string[] } {
+function eligibilityNotes(e: any, p: RankingPatient): { viable: boolean; notes: string[]; pending?: boolean } {
   const notes: string[] = [];
   const crit = e.eligibility_criteria ?? {};
   const t = p.insuranceType;
@@ -97,6 +97,25 @@ function eligibilityNotes(e: any, p: RankingPatient): { viable: boolean; notes: 
   }
   if (government && crit.excludes_government_programs === true) {
     return { viable: false, notes: ['Program terms exclude government coverage.'] };
+  }
+  // Medicare terms a program states (db/030, e.g. the BMS foundation's
+  // eligibility page). false -> not for Medicare; 'unknown' -> our evidence
+  // is unclear, so it is held as pending and never offered; true -> offered
+  // with the program's stated Medicare conditions as notes.
+  const medicare = t === 'medicare_part_d' || t === 'medicare' || t === 'medicare_advantage';
+  if (medicare && 'medicare_allowed' in crit) {
+    if (crit.medicare_allowed === false) {
+      return { viable: false, notes: ['Program terms do not accept Medicare patients.'] };
+    }
+    if (crit.medicare_allowed !== true) {
+      return { viable: false, pending: true, notes: ["Not yet confirmed whether this program accepts Medicare patients, so it isn't offered until it is."] };
+    }
+    if (typeof crit.medicare_oop_spend_test_pct === 'number') {
+      notes.push(`The program states Medicare patients must show they spent at least ${crit.medicare_oop_spend_test_pct}% of yearly household income on prescriptions this calendar year.`);
+    }
+    if (crit.medicare_requires_lis_denial === true) {
+      notes.push('The program states that if you are 65 or older you must first be turned down for Extra Help (the Medicare Low-Income Subsidy), with proof of the denial.');
+    }
   }
   return { viable: true, notes };
 }
@@ -182,6 +201,10 @@ export function rankPathways(input: {
     // patient is notApplicable regardless of its verification state —
     // its conflicts are irrelevant to someone it can't serve.
     const elig = eligibilityNotes(e, patient);
+    if (!elig.viable && elig.pending) {
+      pendingVerification.push({ title: e.title, reason: elig.notes[0] });
+      continue;
+    }
     if (!elig.viable) {
       notApplicable.push({ title: e.title, reason: elig.notes[0] ?? 'Not applicable to your coverage.' });
       continue;

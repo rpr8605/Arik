@@ -132,5 +132,26 @@ check('benchmark never ranked as a patient price', !r.ranked.some((p) => p.month
 check('benchmark never wins even when cheapest', r.winner?.monthlyCostUsd !== 9.51);
 check('cash price still ranks', r.ranked.some((p) => p.monthlyCostUsd === 45));
 
+// Medicare terms a program states (db/030, bmspaf.org eligibility page):
+// true -> offered with its conditions; false -> not applicable; anything
+// else ('unknown') -> pending, never offered to a Medicare patient.
+const paf = (medicare_allowed: unknown) => ({
+  exploit_type: 'pap', title: 'Foundation', status: 'active', verification_status: 'verified_current',
+  patient_price_type: null, patient_price_floor: null,
+  eligibility_criteria: { requires: 'financial_need', medicare_allowed, medicare_oop_spend_test_pct: 3, medicare_requires_lis_denial: true },
+});
+const rose = { insuranceType: 'medicare', stateCode: 'FL' };
+let m = rankPathways({ exploits: [paf(true)], pricePoints: [], stateRow: null, banApplies: false, patient: rose });
+const pafNotes = m.ranked.find((p) => p.title === 'Foundation')?.trajectoryNotes ?? [];
+check('foundation, Medicare allowed: offered to a Medicare patient', m.ranked.some((p) => p.title === 'Foundation'));
+check('foundation, Medicare allowed: carries the 3% out-of-pocket rule', pafNotes.some((n) => /at least 3% of yearly household income/.test(n)));
+check('foundation, Medicare allowed: carries the Extra Help denial rule', pafNotes.some((n) => /turned down for Extra Help/.test(n)));
+m = rankPathways({ exploits: [paf('unknown')], pricePoints: [], stateRow: null, banApplies: false, patient: rose });
+check('foundation, Medicare unknown: never offered to a Medicare patient, held as pending', !m.ranked.some((p) => p.title === 'Foundation') && m.pendingVerification.some((p) => p.title === 'Foundation' && /Medicare/.test(p.reason)));
+m = rankPathways({ exploits: [paf(false)], pricePoints: [], stateRow: null, banApplies: false, patient: { insuranceType: 'medicare_part_d', stateCode: 'FL' } });
+check('foundation, Medicare not allowed: not applicable for Part D', !m.ranked.some((p) => p.title === 'Foundation') && m.notApplicable.some((p) => p.title === 'Foundation'));
+m = rankPathways({ exploits: [paf('unknown')], pricePoints: [], stateRow: null, banApplies: false, patient: { insuranceType: 'uninsured', stateCode: 'TX' } });
+check('foundation, Medicare unknown: still offered to an uninsured patient, no Medicare notes', m.ranked.some((p) => p.title === 'Foundation' && !p.trajectoryNotes.some((n) => /Extra Help/.test(n))));
+
 console.log(failures === 0 ? '\nRANKING ENGINE: ALL PASS' : `\nRANKING ENGINE: ${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

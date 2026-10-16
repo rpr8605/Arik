@@ -70,8 +70,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/023_price_sources_defaults_false.sql` → `db/024_nadac_displayable.sql`
 → `db/025_pharmacies_ingest_runs.sql` → `db/026_rate_limits.sql`
 → `db/027_user_style_prefs.sql` → `db/028_demo_samples.sql`
-→ `db/029_program_phones.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–029
+→ `db/029_program_phones.sql` → `db/030_bmspaf_medicare_terms.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–030
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -206,6 +206,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     benchmarks are not patient prices. One-time offers (free first fill) go
     to `bridges`, never `ranked`: no yearly figure, never the winner; the
     trust receipt and fallback word them as first-fill bridges (2026-10-15).
+    A program's stated Medicare terms (`medicare_allowed` true / false /
+    anything else = unknown) are read in `eligibilityNotes`: unknown is
+    held as pending and never offered to a Medicare patient (db/030).
   - `extractedFacts.ts` — Feature A merge step (built 2026-07-28): every
     extracted fact → durable profile/case/med row immediately;
     contradictions park in `pending_fact_corrections` (never silent
