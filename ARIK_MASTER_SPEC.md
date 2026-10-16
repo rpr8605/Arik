@@ -238,7 +238,7 @@ Format for each module: **Purpose**, **Existing pieces**, **Spec docs**, **Build
 | M05-AC5 | Insurance appears as a labeled path (Confirmed / Plan rules / Estimated / Unknown) | S6 |
 | M05-AC6 | Duplicate discount cards that route through the same processor are collapsed (BLUE_BUTTON_AND_DISCOUNT_GRAPH.md) | S2 |
 
-**Status:** AC1 DONE (82 assertions pass on 2026-10-05). AC2 UNVERIFIED (needs local DB). Others MISSING.
+**Status:** AC1 DONE (82 assertions pass on 2026-10-05). AC2 UNVERIFIED (needs local DB). AC3 DONE (audit 2026-10-05). AC4 DONE 2026-10-16: pharmacy-level prices carry distance from the patient's zip (zip_centroids, db/031), cost first then nearer pharmacy, over 50 miles left out; no pharmacy-level price data is loaded yet (test_ranking.ts). AC5 MISSING. AC6 DONE 2026-10-16: cards sharing `underlying_processor` collapse to the cheapest, naming the others (test_ranking.ts).
 
 ### M16. Arik Agent (the workhorse)
 
@@ -285,7 +285,7 @@ Phased: v1 (S3) prepares and tracks, nothing leaves the system; v2 (S5) sends fo
 | M06-AC7 | Retention purge per source | S2 |
 | M06-AC8 | Tests prove `allow_patient_display=false` rows never reach patient output and `allow_ai_processing=false` rows never reach a model prompt | S2 |
 
-**Status:** all MISSING.
+**Status (2026-10-16):** all DONE. AC1 quote mode added (`PriceQuoteAdapter`, lib/pricing/adapter.ts; config template quote()). AC2/AC4/AC5/AC7/AC8 per docs/status/AUDIT_2026-10-05.md. AC3 pharmacies (db/025) matched by NPI in the ingest runner; unknown NPI is a reject. AC6 one `ingest_runs` row per run, counts and reason counts only (test_ingest_integration.mjs).
 
 ### M07. Partner pricing integration
 
@@ -303,7 +303,7 @@ Phased: v1 (S3) prepares and tracks, nothing leaves the system; v2 (S5) sends fo
 | M07-AC7 | Repo tagged before any partner confidential information arrives | S1 |
 | M07-AC8 | Real partner adapter built from partner docs and passing contract tests | S3 (after docs and data use agreement) |
 
-**Status:** all MISSING.
+**Status (2026-10-16):** AC1 to AC7 DONE, mock only: lib/pricing/http.ts (test_http_client.ts), configAdapter.ts + mockPartner.ts + scripts/mock_partner_api.ts, quotes.ts wired into chat with a note when a source doesn't answer, `npm run source:disable|enable|purge` with source_admin_events, instrumentation.ts + /api/health env check, no-leak test (test_partner_readiness.ts), docs/partner_onboarding_checklist.md. AC8 waits on the partner's written OK and docs (private repo).
 
 ### M08. Price Integrity Loop
 

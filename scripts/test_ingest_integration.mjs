@@ -71,6 +71,13 @@ const { rows: rejReasons } = await client.query(`select error from raw_price_ing
 check('unknown-drug reject names the drug', rejReasons.some((r) => /unknown drug: ROSUVASTATIN 20 MG TABLET/.test(r.error ?? '')), JSON.stringify(rejReasons.map((r) => r.error).slice(0, 2)));
 check('every rejected staging row carries a reason', rejReasons.every((r) => (r.error ?? '').length > 0));
 
+// ingest_runs audit row (M06-AC6): counts and reasons only.
+const lastRun = async () =>
+  (await client.query(`select r.* from ingest_runs r join price_sources s on s.id = r.source_id where s.name = 'nadac' order by r.started_at desc limit 1`)).rows[0];
+const run1 = await lastRun();
+check('run 1: ingest_runs row ok with counts', run1?.status === 'ok' && run1.rows_read === 9 && run1.rows_accepted === 3 && run1.rows_upserted === 2 && run1.rows_rejected === 7 && run1.finished_at != null, JSON.stringify(run1 && { s: run1.status, r: run1.rows_read }));
+check('run 1: error summary is reason counts, no prices', /"unknown drug":1/.test(run1?.error_summary ?? '') && !/9\.51/.test(run1?.error_summary ?? ''), run1?.error_summary);
+
 // --- run 2: idempotency - same file, no duplicates ---
 const { rows: [before] } = await client.query(`select count(*)::int as n from price_points where price_source_id is not null`);
 runIngest();
@@ -94,11 +101,32 @@ const { rows: [ppAfter] } = await client.query(`select count(*)::int as n from p
 const { rows: [rawAfter] } = await client.query(`select count(*)::int as n from raw_price_ingest`);
 check('dry run: prints the summary', /DRY RUN - nothing written/.test(outDry));
 check('dry run: zero writes', ppBefore.n === ppAfter.n && rawBefore.n === rawAfter.n, `pp ${ppBefore.n}->${ppAfter.n}, raw ${rawBefore.n}->${rawAfter.n}`);
+check('dry run: ingest_runs row marked dry_run', (await lastRun())?.status === 'dry_run');
 
 // --- disabled source is skipped ---
 await client.query(`update price_sources set enabled = false where name = 'nadac'`);
 const outSkip = runIngest();
 check('disabled source: skip message, no work', /SKIP: source 'nadac' is disabled/.test(outSkip));
+check('disabled source: ingest_runs row skipped_disabled', (await lastRun())?.status === 'skipped_disabled');
+await client.query(`update price_sources set enabled = true where name = 'nadac'`);
+
+// --- kill switch and purge (M07-AC5), through the npm commands' script ---
+const admin = (action) =>
+  execFileSync(process.execPath, ['--import', 'tsx', 'scripts/source_admin.ts', action, 'nadac'], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 120000 });
+const { rows: [{ t0 }] } = await client.query(`select now() as t0`);
+admin('disable');
+const { rows: [dis] } = await client.query(`select enabled from price_sources where name = 'nadac'`);
+check('source:disable turns the source off', dis.enabled === false);
+admin('enable');
+const outPurge = admin('purge');
+const { rows: [left] } = await client.query(`select count(*)::int as n from price_points p join price_sources s on s.id = p.price_source_id where s.name = 'nadac'`);
+const { rows: [pur] } = await client.query(`select enabled from price_sources where name = 'nadac'`);
+check('source:purge deletes the source rows and leaves it disabled', left.n === 0 && pur.enabled === false && /price_points_deleted":3/.test(outPurge), outPurge.trim());
+const { rows: events } = await client.query(
+  `select action, detail from source_admin_events e join price_sources s on s.id = e.source_id where s.name = 'nadac' and e.created_at >= $1 order by e.created_at`, [t0]);
+const pd = events[2]?.detail ?? {};
+check('every admin action wrote one audit event, counts only', events.map((e) => e.action).join() === 'disable,enable,purge' && pd.price_points_deleted === 3 && pd.raw_rows_deleted === 27 && pd.ingest_runs_deleted >= 4 && Object.values(pd).every((v) => Number.isInteger(v)), JSON.stringify(events.map((e) => e.detail)));
+await client.query(`delete from source_admin_events where created_at >= $1`, [t0]);
 await client.query(`update price_sources set enabled = true where name = 'nadac'`);
 
 // --- teardown: leave the local DB as found ---

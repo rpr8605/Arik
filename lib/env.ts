@@ -8,6 +8,9 @@
 // so they must be present when the container image is built (Dockerfile
 // build args), not only at runtime.
 
+import { checkSourceEnv } from './pricing/configAdapter';
+import { QUOTE_SOURCE_CONFIGS } from './pricing/quoteSources';
+
 export type EnvScope = 'server' | 'public';
 
 export interface EnvVar {
@@ -27,10 +30,13 @@ export const ENV_VARS: EnvVar[] = [
   { name: 'MODEL_TIMEOUT_MS', scope: 'server', required: false, purpose: 'Model call timeout in ms (default 60000)' },
   { name: 'APP_VERSION', scope: 'server', required: false, purpose: 'Git SHA or release tag reported by /api/health (set automatically from the build commit when unset)' },
   { name: 'RATE_LIMIT_ANON_DAILY_MODEL_CAP', scope: 'server', required: false, purpose: 'Combined daily model-request cap for all anonymous users (default 200)' },
-  { name: 'DEMO_MODE', scope: 'server', required: false, purpose: 'Sample patients picker and /api/demo/* when exactly "true" (Vercel demo only; needs db/028)' },
+  { name: 'DEMO_MODE', scope: 'server', required: false, purpose: 'Sample patients picker and /api/demo/* when "true" or "1" (Vercel demo only; needs db/028)' },
   { name: 'RATE_LIMIT_IP_SALT', scope: 'server', required: false, purpose: 'Key for hashing client IPs in rate-limit counters (default: derived from the service-role key)' },
 ];
 
+// Includes the env var names any ENABLED price source needs (M07-AC6).
 export function missingEnv(): string[] {
-  return ENV_VARS.filter((v) => v.required && !process.env[v.name]).map((v) => v.name);
+  const base = ENV_VARS.filter((v) => v.required && !process.env[v.name]).map((v) => v.name);
+  const sources = checkSourceEnv(QUOTE_SOURCE_CONFIGS, process.env).missing.flatMap((m) => m.vars);
+  return [...base, ...sources.filter((n) => !base.includes(n))];
 }

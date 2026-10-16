@@ -153,5 +153,46 @@ check('foundation, Medicare not allowed: not applicable for Part D', !m.ranked.s
 m = rankPathways({ exploits: [paf('unknown')], pricePoints: [], stateRow: null, banApplies: false, patient: { insuranceType: 'uninsured', stateCode: 'TX' } });
 check('foundation, Medicare unknown: still offered to an uninsured patient, no Medicare notes', m.ranked.some((p) => p.title === 'Foundation' && !p.trajectoryNotes.some((n) => /Extra Help/.test(n))));
 
+// M05-AC6: discount cards sharing a processor (BIN/PCN network) are one option.
+const dc = (title: string, price: number | null, processor: string | null) => ({
+  exploit_type: 'discount_card', title, status: 'active', verification_status: 'verified_current',
+  patient_price_type: 'flat', patient_price_floor: price, eligibility_criteria: {}, underlying_processor: processor,
+});
+const coll = rankPathways({
+  exploits: [dc('Card A', 30, 'NetX'), dc('Card B', 25, 'netx '), dc('Card C', 40, 'NetY'), dc('Card D', 20, null)],
+  pricePoints: [], stateRow: null, banApplies: false, patient: { insuranceType: 'uninsured', stateCode: 'TX' },
+});
+const titles = coll.ranked.map((p) => p.title);
+check('shared processor: only the cheapest card of a network is shown', titles.includes('Card B') && !titles.includes('Card A'));
+check('shared processor: the kept card names the duplicate', coll.ranked.find((p) => p.title === 'Card B')?.trajectoryNotes.some((n) => /Same discount network as Card A/.test(n)) === true);
+check('different processors and cards without one are untouched', titles.includes('Card C') && titles.includes('Card D') && titles.length === 3);
+
+// M05-AC4: pharmacy-level prices with distance from the patient's zip.
+const at = (name: string, price: number, lat: number, lng: number, id: string) => ({
+  price_type: 'cash', price_usd: price, supply_days: 30, pharmacy_id: id, pharmacies: { name, lat, lng }, sources: { title: 'S', url: null, last_verified_at: null },
+});
+const nyc = { lat: 40.7506, lng: -73.9972 };   // ZCTA 10001 centroid area
+const pharm = rankPathways({
+  exploits: [], stateRow: null, banApplies: false,
+  pricePoints: [
+    at('Near', 20, 40.7527, -73.9772, 'p1'),       // ~1 mile
+    at('Mid', 20, 40.8448, -73.8648, 'p2'),        // ~9 miles, same price
+    at('Cheap far', 10, 42.6526, -73.7562, 'p3'),  // Albany, ~130 miles
+    at('Cheaper', 15, 40.7300, -74.0000, 'p4'),
+  ],
+  patient: { insuranceType: 'uninsured', stateCode: 'NY', location: nyc },
+});
+const order = pharm.ranked.map((p) => p.pharmacy?.name);
+check('pharmacy prices: cost first, then the nearer pharmacy among equal prices', order.join() === 'Cheaper,Near,Mid', order.join());
+check('pharmacy prices: one more than 50 miles away is left out', !order.includes('Cheap far'));
+check('pharmacy prices: distance shown in miles', (pharm.ranked.find((p) => p.pharmacy?.name === 'Near')?.pharmacy?.distanceMiles ?? 99) < 2 && /miles from you/.test(pharm.ranked[1].trajectoryNotes[0]));
+const noLoc = rankPathways({
+  exploits: [], stateRow: null, banApplies: false,
+  pricePoints: [at('Near', 20, 40.7527, -73.9772, 'p1'), at('Cheap far', 10, 42.6526, -73.7562, 'p3')],
+  patient: { insuranceType: 'uninsured', stateCode: 'NY' },
+});
+check('no patient location: every pharmacy kept, distance unknown, still cost order', noLoc.ranked.map((p) => p.pharmacy?.name).join() === 'Cheap far,Near' && noLoc.ranked.every((p) => p.pharmacy?.distanceMiles === null));
+check('national prices (no pharmacy) still rank as before', rankPathways({ exploits: [], stateRow: null, banApplies: false, pricePoints: [{ price_type: 'list', price_usd: 521, supply_days: 30 }], patient: { insuranceType: 'uninsured', stateCode: 'TX' } }).ranked[0]?.title === 'list price');
+
 console.log(failures === 0 ? '\nRANKING ENGINE: ALL PASS' : `\nRANKING ENGINE: ${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

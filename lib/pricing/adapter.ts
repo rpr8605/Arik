@@ -60,10 +60,29 @@ export interface AdapterFetchOptions {
   file?: string;
 }
 
+// Two modes (M06-AC1): a bulk source is pulled on a schedule by the
+// ingest runner; a quote source is asked live, per NDC, quantity and zip,
+// by the chat (lib/pricing/quotes.ts) with a cache and a fallback.
+export type AdapterMode = 'bulk' | 'quote';
+
+export interface QuoteRequest {
+  ndc: string;          // 11 digits
+  quantity: number;     // units
+  zip: string | null;   // 5 digits when known
+}
+
+export interface PriceQuoteAdapter {
+  readonly id: string;           // price_sources.name
+  readonly displayName: string;  // public label, never a partner's name in this repo
+  readonly mode: 'quote';
+  quote(req: QuoteRequest): Promise<NormalizedBatch>;
+}
+
 export interface PriceSourceAdapter {
   // Matches price_sources.name in the DB (db/022).
   readonly id: string;
   readonly displayName: string;
+  readonly mode?: 'bulk';
   // Soft contract with the runner: the runner refuses to run an adapter
   // whose price_sources row has enabled = false. This flag is the
   // code-side default when seeding the row.

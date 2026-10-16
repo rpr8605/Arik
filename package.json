@@ -9,7 +9,11 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run_tests.mjs",
     "db:reset": "node scripts/db_reset.mjs",
-    "db:check": "node scripts/db_check.mjs"
+    "db:check": "node scripts/db_check.mjs",
+    "ingest": "tsx scripts/ingest_prices.ts --source",
+    "source:disable": "tsx scripts/source_admin.ts disable",
+    "source:enable": "tsx scripts/source_admin.ts enable",
+    "source:purge": "tsx scripts/source_admin.ts purge"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",

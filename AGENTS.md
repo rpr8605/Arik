@@ -71,7 +71,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/025_pharmacies_ingest_runs.sql` → `db/026_rate_limits.sql`
 → `db/027_user_style_prefs.sql` → `db/028_demo_samples.sql`
 → `db/029_program_phones.sql` → `db/030_bmspaf_medicare_terms.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–030
+→ `db/031_pricing_s2_closeout.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–031
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -307,6 +308,20 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   - `chatRetrieval.ts` — builds the chat route's RETRIEVED_CONTEXT. The
     AI/display consent gates run INSIDE it, so a barred row cannot reach
     an OpenRouter prompt without bypassing the one function the route calls.
+  - S2 partner readiness (2026-10-16, mock only): `pricing/http.ts`
+    hardened client (timeout, 5xx backoff+jitter, 429 Retry-After,
+    per-source circuit breaker; errors carry no bodies/URLs),
+    `pricing/configAdapter.ts` (config-driven adapter: api_key/bearer/
+    OAuth, page/offset/cursor, field map; `checkSourceEnv` +
+    `instrumentation.ts` fail fast on missing env NAMES),
+    `pricing/mockPartner.ts` (+ `scripts/mock_partner_api.ts`),
+    `pricing/quotes.ts` + `quoteSources.ts` (live quotes in chat; the
+    registry is EMPTY in this repo, real partner configs live in the
+    private repo), `pricing/sourceAdmin.ts` + `npm run source:disable|
+    enable|purge`. Ingest runner writes `ingest_runs` and matches pharmacy
+    NPIs. db/031 adds price_sources kind/mode, the pharmacy-aware natural
+    key and `zip_centroids`. Tests: `test_http_client.ts`,
+    `test_partner_readiness.ts`, `test_ingest_integration.mjs` (arik-pg).
   - `pricing/adapter.ts` — source-agnostic `PriceSourceAdapter` contract
     (fetch/normalize → `NormalizedPrice`; rejects are logged, never
     coerced), `pricing/adapters/` (registry + `nadac.ts`; field mapping

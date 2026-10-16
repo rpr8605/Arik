@@ -13,6 +13,11 @@
 //   mistake this script refuses to make.
 //
 // Exit codes: 0 ok (incl. source-disabled skip), 1 operational failure.
+//
+// Every run writes one ingest_runs row (db/025, M06-AC6): counts and a
+// reason -> count map only, never prices or payloads. A record carrying a
+// pharmacy NPI is matched to the pharmacies table (M06-AC3); an NPI that
+// isn't there is a reject, never a guessed pharmacy.
 
 import pg from 'pg';
 import { ADAPTER_FACTORIES } from '../lib/pricing/adapters/index';
@@ -104,14 +109,37 @@ async function main() {
     process.exit(1);
   }
   const source = sources[0];
+  const { rows: runRows } = await client.query(
+    `insert into ingest_runs (source_id, status) values ($1, $2) returning id`,
+    [source.id, source.enabled ? 'running' : 'skipped_disabled'],
+  );
+  const runId = runRows[0].id as string;
+  const finishRun = (status: string, counts: Record<string, number | null>, summary: Record<string, number> | string | null) =>
+    client.query(
+      `update ingest_runs set status = $2, finished_at = now(), rows_read = $3, rows_accepted = $4,
+         rows_upserted = $5, rows_rejected = $6, error_summary = $7 where id = $1`,
+      [runId, status, counts.read ?? null, counts.accepted ?? null, counts.upserted ?? null, counts.rejected ?? null,
+       summary == null ? null : typeof summary === 'string' ? summary : JSON.stringify(summary)],
+    );
   if (!source.enabled) {
+    await finishRun('skipped_disabled', {}, null);
     console.log(`SKIP: source '${args.source}' is disabled in price_sources.`);
     await client.end();
     process.exit(0);
   }
 
   const adapter = factory(source.id);
-  const raw = await adapter.fetch(args.file ? { file: args.file } : {});
+  let raw: unknown[];
+  try {
+    raw = await adapter.fetch(args.file ? { file: args.file } : {});
+  } catch (e) {
+    // The kind of failure only: an adapter error could name an endpoint.
+    await finishRun('failed', {}, `fetch failed: ${(e as Error).name}`);
+    await client.end();
+    throw new Error('fetch failed');
+  }
+  const { rows: pharmacyRows } = await client.query('select id, npi from pharmacies where npi is not null');
+  const pharmacyByNpi = new Map<string, string>(pharmacyRows.map((r: { id: string; npi: string }) => [r.npi, r.id]));
 
   // Per-record pipeline: normalize each record individually so every
   // staging row's final status maps to exactly one raw payload (batch
@@ -120,10 +148,10 @@ async function main() {
   interface Disposition {
     staging: 'upserted' | 'rejected';
     reason?: string;
-    row?: NormalizedPrice & { drug_id: string };
+    row?: NormalizedPrice & { drug_id: string; pharmacy_id: string | null };
   }
   const dispositions: Disposition[] = [];
-  const upsertable: (NormalizedPrice & { drug_id: string })[] = [];
+  const upsertable: (NormalizedPrice & { drug_id: string; pharmacy_id: string | null })[] = [];
   const runnerRejects: RejectedRecord[] = [];
   let acceptedCount = 0;
   for (const record of raw) {
@@ -136,11 +164,16 @@ async function main() {
     acceptedCount++;
     const row = accepted[0];
     const match = matchDrug(row.drug_name, drugs);
+    const pharmacyId = row.pharmacy_npi ? pharmacyByNpi.get(row.pharmacy_npi) ?? null : null;
     if ('error' in match) {
       runnerRejects.push({ reason: match.error, raw: record });
       dispositions.push({ staging: 'rejected', reason: match.error });
+    } else if (row.pharmacy_npi && !pharmacyId) {
+      const reason = 'unknown pharmacy npi';
+      runnerRejects.push({ reason, raw: record });
+      dispositions.push({ staging: 'rejected', reason });
     } else {
-      const withDrug = { ...row, drug_id: match.id };
+      const withDrug = { ...row, drug_id: match.id, pharmacy_id: pharmacyId };
       upsertable.push(withDrug);
       dispositions.push({ staging: 'upserted', row: withDrug });
     }
@@ -161,7 +194,9 @@ async function main() {
   }
   console.log(`upsertable:    ${upsertable.length}`);
 
+  const reasonSummary = Object.fromEntries(reasonCounts);
   if (args.dryRun) {
+    await finishRun('dry_run', { read: raw.length, accepted: acceptedCount, upserted: 0, rejected: runnerRejects.length }, reasonSummary);
     console.log('\nDRY RUN - nothing written.');
     await client.end();
     process.exit(0);
@@ -197,12 +232,12 @@ async function main() {
       await client.query(
         `insert into price_points
            (drug_id, price_type, supply_days, unit_count, price_usd,
-            price_source_id, ndc, observed_at, expires_at)
-         values ($1, $2, null, $3, $4, $5, $6, $7, $8)
-         on conflict (price_source_id, drug_id, price_type, ndc, supply_days, unit_count, observed_at)
+            price_source_id, ndc, observed_at, expires_at, pharmacy_id)
+         values ($1, $2, null, $3, $4, $5, $6, $7, $8, $9)
+         on conflict (price_source_id, drug_id, price_type, ndc, supply_days, unit_count, observed_at, pharmacy_id)
          do update set price_usd = excluded.price_usd,
                        expires_at = excluded.expires_at`,
-        [row.drug_id, row.price_type, row.quantity, row.price, row.source_id, row.ndc, row.observed_at, row.expires_at],
+        [row.drug_id, row.price_type, row.quantity, row.price, row.source_id, row.ndc, row.observed_at, row.expires_at, row.pharmacy_id],
       );
       upserted++;
     }
@@ -218,10 +253,12 @@ async function main() {
     }
 
     await client.query('commit');
+    await finishRun('ok', { read: raw.length, accepted: acceptedCount, upserted, rejected: runnerRejects.length }, reasonSummary);
     console.log(`upserted:      ${upserted}`);
     console.log(`staged:        ${stagingIds.length} raw rows (${runnerRejects.length} rejected with reasons)`);
   } catch (e) {
     await client.query('rollback');
+    await finishRun('failed', { read: raw.length, accepted: acceptedCount, rejected: runnerRejects.length }, `write failed: ${(e as Error).name}`).catch(() => {});
     throw e;
   } finally {
     await client.end();

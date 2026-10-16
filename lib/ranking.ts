@@ -28,6 +28,8 @@ export interface RankingPatient {
   incomePctFpl?: number | null;
   householdSize?: number | null;
   drugCovered?: boolean | null;   // does the patient's plan cover this drug at all (drives branch cards)
+  zip?: string | null;            // the loader turns it into `location` (zip_centroids, db/031)
+  location?: { lat: number; lng: number } | null;   // for pharmacy distance (M05-AC4)
 }
 
 export interface RankedPathway {
@@ -40,6 +42,9 @@ export interface RankedPathway {
   trajectoryNotes: string[];
   verificationStatus: string;
   source: { title: string | null; url: string | null; last_verified_at: string | null } | null;
+  // Pharmacy-level prices only (M05-AC4). distanceMiles is null when the
+  // patient's location or the pharmacy's coordinates are unknown.
+  pharmacy?: { name: string | null; distanceMiles: number | null };
 }
 
 export interface RankingResult {
@@ -63,6 +68,49 @@ export interface RankingResult {
   // response says which - an exclusion is an answer, not an omission.
   excludedPrices: { label: string; reason: string }[];
 }
+
+// M05-AC6 (BLUE_BUTTON_AND_DISCOUNT_GRAPH.md): cards that route through
+// the same processor (BIN/PCN network) are one option, not several. Keep
+// the cheapest (lowest stated price; ties by title), and name the others
+// on it. Rows without underlying_processor are untouched.
+export function collapseSharedProcessor(rows: any[]): { kept: any[]; alsoAs: Record<string, string[]> } {
+  const groups = new Map<string, any[]>();
+  const kept: any[] = [];
+  for (const r of rows) {
+    const key = typeof r.underlying_processor === 'string' ? r.underlying_processor.trim().toLowerCase() : '';
+    if (!key) {
+      kept.push(r);
+      continue;
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(r);
+  }
+  const alsoAs: Record<string, string[]> = {};
+  for (const g of groups.values()) {
+    g.sort((a, b) => {
+      const pa = a.patient_price_floor != null ? Number(a.patient_price_floor) : Infinity;
+      const pb = b.patient_price_floor != null ? Number(b.patient_price_floor) : Infinity;
+      return pa - pb || String(a.title).localeCompare(String(b.title));
+    });
+    kept.push(g[0]);
+    if (g.length > 1) alsoAs[g[0].title] = g.slice(1).map((x) => x.title);
+  }
+  return { kept, alsoAs };
+}
+
+// Great-circle distance in miles (haversine).
+export function milesBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 3958.8;
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// Pharmacies further than this are left out when the patient's location
+// is known: a price two states away is not an option.
+export const MAX_PHARMACY_MILES = 50;
 
 // Shallow eligibility matcher — DELIBERATELY minimal until the fold's full
 // criteria vocabulary lands. Anything it can't evaluate becomes a note,
@@ -192,7 +240,8 @@ export function rankPathways(input: {
   const ranked: RankedPathway[] = [];
   const bridges: RankedPathway[] = [];
 
-  for (const e of viable) {
+  const { kept: deduped, alsoAs } = collapseSharedProcessor(viable);
+  for (const e of deduped) {
     if (e.status === 'closed') {
       pendingVerification.push({ title: e.title, reason: `Currently closed/unavailable${e.closed_reason ? ` (${e.closed_reason})` : ''}.` });
       continue;
@@ -252,6 +301,7 @@ export function rankPathways(input: {
     }
     if (isCard(e) && stateNote) notes.push(stateNote.headline);
     if (oneTime) notes.push('One-time offer: a bridge, not a long-term answer; pair it with a monthly pathway.');
+    if (alsoAs[e.title]) notes.push(`Same discount network as ${alsoAs[e.title].join(', ')}, so it is shown once.`);
     (oneTime ? bridges : ranked).push({
       kind: e.exploit_type,
       title: e.title,
@@ -291,10 +341,16 @@ export function rankPathways(input: {
     label: `${x.row.price_type ?? 'price'}`,
     reason: x.reason,
   }));
-  const pricePathways = pricePointsToPathways(priceConsent.allowed);
+  const pricePathways = pricePointsToPathways(priceConsent.allowed, patient.location ?? null);
   ranked.push(...pricePathways);
 
-  ranked.sort((a, b) => (a.projectedAnnualCostUsd ?? Infinity) - (b.projectedAnnualCostUsd ?? Infinity));
+  // Cost first (Arik's rule: the lowest trajectory cost wins); among equal
+  // costs the nearer pharmacy comes first, unknown distance last.
+  ranked.sort(
+    (a, b) =>
+      (a.projectedAnnualCostUsd ?? Infinity) - (b.projectedAnnualCostUsd ?? Infinity) ||
+      (a.pharmacy?.distanceMiles ?? Infinity) - (b.pharmacy?.distanceMiles ?? Infinity),
+  );
   bridges.sort((a, b) => (a.monthlyCostUsd ?? Infinity) - (b.monthlyCostUsd ?? Infinity));
   // WINNER: lowest projected 3-12 month cost among ongoing pathways.
   // Bridges never enter `ranked`, so a one-time trial can't win.
@@ -307,7 +363,46 @@ function bestMonthlyPrice(pricePoints: any[]): number | null {
   return monthly.length ? Math.min(...monthly) : null;
 }
 
-function pricePointsToPathways(pricePoints: any[]): RankedPathway[] {
+function pricePointsToPathways(pricePoints: any[], location: { lat: number; lng: number } | null = null): RankedPathway[] {
+  // Pharmacy-level rows (M05-AC4): one pathway per pharmacy and price type,
+  // with the distance from the patient when both locations are known.
+  const atPharmacy = (pricePoints ?? []).filter((pp: any) => pp.pharmacy_id && pp.pharmacies);
+  const national = (pricePoints ?? []).filter((pp: any) => !(pp.pharmacy_id && pp.pharmacies));
+  const pharmacyPathways: RankedPathway[] = [];
+  const byPharmacy = new Map<string, any[]>();
+  for (const pp of atPharmacy) {
+    if (pp.price_type === 'acquisition_benchmark') continue;
+    const k = `${pp.price_type}|${pp.pharmacy_id}`;
+    if (!byPharmacy.has(k)) byPharmacy.set(k, []);
+    byPharmacy.get(k)!.push(pp);
+  }
+  for (const rows of byPharmacy.values()) {
+    const best = rows
+      .map((r) => ({ r, monthly: r.supply_days ? (Number(r.price_usd) * 30) / r.supply_days : Number(r.price_usd) }))
+      .filter((x) => Number.isFinite(x.monthly))
+      .sort((a, b) => a.monthly - b.monthly)[0];
+    if (!best) continue;
+    const ph = best.r.pharmacies;
+    const known = location && Number.isFinite(ph.lat) && Number.isFinite(ph.lng);
+    const miles = known ? Math.round(milesBetween(location!, { lat: ph.lat, lng: ph.lng }) * 10) / 10 : null;
+    if (miles != null && miles > MAX_PHARMACY_MILES) continue;
+    pharmacyPathways.push({
+      kind: 'price_point',
+      title: `${String(best.r.price_type).replaceAll('_', ' ')} price at ${ph.name ?? 'a pharmacy'}`,
+      monthlyCostUsd: Math.round(best.monthly * 100) / 100,
+      priceSemantics: 'flat',
+      projectedAnnualCostUsd: Math.round(best.monthly * 12 * 100) / 100,
+      oneTime: false,
+      trajectoryNotes: [miles != null ? `About ${miles} miles from you.` : 'Distance unknown: add your zip code to see how far it is.'],
+      verificationStatus: 'verified_current',
+      source: best.r.sources ? { title: best.r.sources.title ?? null, url: best.r.sources.url ?? null, last_verified_at: best.r.sources.last_verified_at ?? null } : null,
+      pharmacy: { name: ph.name ?? null, distanceMiles: miles },
+    });
+  }
+  return [...pharmacyPathways, ...nationalPathways(national)];
+}
+
+function nationalPathways(pricePoints: any[]): RankedPathway[] {
   const byType = new Map<string, any[]>();
   for (const pp of pricePoints ?? []) {
     const k = pp.price_type;
@@ -396,12 +491,23 @@ export async function rankSavingsPathsForDrug(input: {
       banApplies = ban === true;
     }
   }
+  // Patient location for pharmacy distance: zip centroid (db/031). Any
+  // failure (table not there yet, unknown zip) just means no distance.
+  let location = input.patient.location ?? null;
+  if (!location && input.patient.zip && /^\d{5}$/.test(input.patient.zip)) {
+    try {
+      const { data } = await supabaseAdmin().from('zip_centroids').select('lat, lng').eq('zip', input.patient.zip).maybeSingle();
+      if (data && Number.isFinite(data.lat) && Number.isFinite(data.lng)) location = { lat: data.lat, lng: data.lng };
+    } catch {
+      location = null;
+    }
+  }
   return rankPathways({
     exploits: input.exploits,
     pricePoints: input.pricePoints,
     stateRow,
     banApplies,
-    patient: input.patient,
+    patient: { ...input.patient, location },
     conflictsByExploitId,
     priceSources,
     asOf: new Date().toISOString(),

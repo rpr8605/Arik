@@ -54,6 +54,9 @@ export interface ChatSubject {
   preferredLanguage: string | null;
   explanationStyle: string | null;
   coverageUnknownManaged: boolean;
+  // For pharmacy distance and live quotes only. Never in the model's view
+  // (subjectModelProfile / MODEL_PROFILE_FIELDS leave it out).
+  zip: string | null;
 }
 
 // sample (DEMO_DAY stage 1): a sample case is about the fictional person in
@@ -78,6 +81,7 @@ export function resolveChatSubject(input: {
       preferredLanguage: reader?.preferred_language ?? null,
       explanationStyle: reader?.explanation_style ?? null,
       coverageUnknownManaged: false,
+      zip: null,
     };
   }
   if (!input.managedPatient) {
@@ -91,6 +95,7 @@ export function resolveChatSubject(input: {
       preferredLanguage: reader?.preferred_language ?? null,
       explanationStyle: reader?.explanation_style ?? null,
       coverageUnknownManaged: false,
+      zip: typeof reader?.zip_code === 'string' && /^\d{5}$/.test(reader.zip_code) ? reader.zip_code : null,
     };
   }
   const zip = input.managedPatient.zip_code;
@@ -104,6 +109,7 @@ export function resolveChatSubject(input: {
     preferredLanguage: reader?.preferred_language ?? null,
     explanationStyle: reader?.explanation_style ?? null,
     coverageUnknownManaged: true,
+    zip: zip && /^\d{5}$/.test(zip) ? zip : null,
   };
 }
 

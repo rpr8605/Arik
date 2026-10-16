@@ -28,7 +28,7 @@ export async function loadRxOptions(drugName: string, sample: SamplePatient): Pr
 
   const [{ data: exploits }, { data: prices }] = await Promise.all([
     sb.from('exploits').select('*, sources!exploits_source_id_fkey(*)').in('drug_id', drugIds).eq('status', 'active'),
-    sb.from('price_points').select('*, sources(*)').in('drug_id', drugIds),
+    sb.from('price_points').select('*, sources(*), pharmacies(name, lat, lng)').in('drug_id', drugIds),
   ]);
 
   const subject = resolveChatSubject({ userProfile: null, managedPatient: null, sample: sample.subject });

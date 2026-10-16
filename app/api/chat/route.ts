@@ -34,6 +34,11 @@ import {
 } from '@/lib/chatSubject';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
 import { pickProgramPhone } from '@/lib/programPhone';
+import { createQuoteCache, getQuotes, quoteToPriceRow, unavailableNote } from '@/lib/pricing/quotes';
+import { enabledQuoteAdapters } from '@/lib/pricing/quoteSources';
+
+// Per-instance quote cache (10 minutes).
+const QUOTE_CACHE = createQuoteCache();
 import { buildResponsePrompt, retrievedContextFor } from '@/lib/chatPrompt';
 
 // Created lazily per call - a module-level client crashes Next's
@@ -234,7 +239,7 @@ async function retrieveContext(userId: string, intent: Intent, profile: any, man
       // db/017 added a second sources FK (aks/terms citations) — the embed
       // must name the FK or PostgREST rejects it as ambiguous.
       supabase().from('exploits').select('*, sources!exploits_source_id_fkey(*)').in('drug_id', drugIds).eq('status', 'active'),
-      supabase().from('price_points').select('*, sources(*)').in('drug_id', drugIds),
+      supabase().from('price_points').select('*, sources(*), pharmacies(name, lat, lng)').in('drug_id', drugIds),
       supabase().from('accumulator_policies').select('*, sources(*)'),
       // Tiny reference table (9 rows), always included: counter rejections
       // are reported mid-conversation, not asked about by drug name.
@@ -482,12 +487,28 @@ export async function POST(req: Request) {
     blockedCards: blocked,
   };
 
+  // Live quotes (M07-AC4): enabled quote-mode sources only. None are
+  // registered in this repo (lib/pricing/quoteSources.ts), so today this
+  // returns at once with no database call. A source that fails is named in
+  // a note and the answer comes from everything else; quote rows pass the
+  // same consent/staleness partition as every price. Quantity 30 = the
+  // usual 30-count fill; it never sets supply days.
+  const quoteAdapters = await enabledQuoteAdapters(async (names) =>
+    ((await supabase().from('price_sources').select('id, name, enabled').in('name', names)).data ?? []) as { id: string; name: string; enabled: boolean }[],
+  );
+  const quoteDrugId = (context.prices ?? [])[0]?.drug_id ?? null;
+  const quoteNdcs = [...new Set((context.prices ?? []).map((p: any) => p.ndc).filter(Boolean))].slice(0, 3) as string[];
+  const quotes = quoteDrugId
+    ? await getQuotes(quoteAdapters, quoteNdcs.map((ndc) => ({ ndc, quantity: 30, zip: subject.zip })), { cache: QUOTE_CACHE })
+    : { prices: [], unavailable: [] as string[] };
+  const pricesWithQuotes = [...(context.prices ?? []), ...quotes.prices.map((q) => quoteToPriceRow(q, quoteDrugId))];
+
   // The ranking engine (lib/ranking.ts): deterministic pathway ordering
   // with 3-12 month trajectory costs. Runs only when something drug-
   // specific exists to rank; its output drives the response's pathway
   // order — the model presents it, it does not invent its own ranking.
   const ranking =
-    viable.length > 0 || (context.prices ?? []).length > 0
+    viable.length > 0 || pricesWithQuotes.length > 0
       ? await rankSavingsPathsForDrug({
           drugName: intent.drug_name ?? '',
           patient: {
@@ -496,11 +517,12 @@ export async function POST(req: Request) {
             incomePctFpl: subject.incomePctFpl,
             householdSize: subject.householdSize,
             drugCovered: intent.drug_covered ?? null,
+            zip: subject.zip,
           },
           // Unknown managed-patient coverage: the ranker never sees the
           // held-back copay cards, so it can't rank one (review fix C1).
           exploits: blockReason === 'managed_unknown' ? viable : context.exploits ?? [],
-          pricePoints: context.prices ?? [],
+          pricePoints: pricesWithQuotes,
         })
       : null;
   modelContext.rankedPathways = ranking;
@@ -515,7 +537,7 @@ export async function POST(req: Request) {
   const nothingDrugSpecific =
     viable.length === 0 && (context.prices ?? []).length === 0;
   if (nothingDrugSpecific) {
-    const response = compose(STRINGS.noData[lang](intent.drug_name) + blockedNote, true);
+    const response = compose(STRINGS.noData[lang](intent.drug_name) + blockedNote + unavailableNote(quotes.unavailable, lang), true);
     await supabase().from('chat_messages').insert([
       { session_id: sessionId, role: 'user', content: message },
       { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: [] },
@@ -537,7 +559,7 @@ export async function POST(req: Request) {
     history: history ?? [],
     lang,
     format: useCardFormat ? 'card' : 'standard',
-    blockedNote,
+    blockedNote: blockedNote + unavailableNote(quotes.unavailable, lang),
     ranking,
     styleBlock: styleBlock(style),
   });
