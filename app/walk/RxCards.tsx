@@ -47,7 +47,7 @@ export function RxResults({ data }: { data: RxOptions }) {
     return (
       <div className="rx-card">
         <p>
-          Prices for <strong>{data.drug}</strong> aren&apos;t loaded in Arik&apos;s sourced data yet, so I won&apos;t guess.
+          Prices for <strong>{data.drug}</strong>{' '}aren&apos;t loaded in Arik&apos;s sourced data yet, so I won&apos;t guess.
         </p>
       </div>
     );
