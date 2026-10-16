@@ -42,7 +42,7 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   const { data: userCases } = await sb.from('cases').select('id').eq('user_id', userId);
   const caseIds = (userCases ?? []).map((c) => c.id);
   if (caseIds.length > 0) {
-    for (const child of ['case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
+    for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
       await del(child, (q) => q.in('case_id', caseIds));
     }
   }
@@ -61,7 +61,7 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
       .in('managed_patient_id', managedIds);
     const managedCaseIds = (managedCases ?? []).map((c) => c.id);
     if (managedCaseIds.length > 0) {
-      for (const child of ['case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
+      for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
         await del(child, (q) => q.in('case_id', managedCaseIds));
       }
       // Sessions riding on managed cases (keyed by case_id, in case the
@@ -77,9 +77,12 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
     await del('managed_patients', (q) => q.in('id', managedIds));
   }
 
+  // Findings and letters point at uploaded documents (and a frozen letter
+  // refuses the update a "set null" would make), so they go first.
   for (const table of [
-    'uploaded_documents',
+    'letters',
     'bill_audit_findings',
+    'uploaded_documents',
     'denial_appeals',
     'output_documents',
     'mtm_eligibility_checks',

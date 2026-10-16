@@ -11,6 +11,8 @@ When each public data source is refreshed, the command that does it, and how lon
 | Transparency in Coverage PUF (registry D1) | Annually (new plan year each fall) | October 1 | `npm run ingest -- tic_puf --year <plan year file>` | PY2026 file, 374 issuer rows |
 | Prior authorization metrics (registry D2) | Annually by March 31 | April, by hand from payer sites | `npm run ingest -- prior_auth --file <metrics.csv>` (template: `docs/research/prior_auth_metrics_template.csv`) | none yet |
 | Census ZCTA gazetteer (zip centroids) | Annually | January | `npx tsx scripts/load_drug_data.ts zips` | 2025 file, 33,791 zips |
+| Medicare unit limits (NCCI MUE, practitioner + outpatient hospital) and Physician Fee Schedule RVU file (bill checks, db/039) | Quarterly (Jan, Apr, Jul, Oct 1) | First week of each quarter; update the file names in `scripts/load_bill_refs.ts` | `npm run ingest -- bill_refs` | 2026 Q4: 15,212 + 15,162 limits, 8,599 fee amounts, 1 s |
+| NCCI procedure-to-procedure pairs (bill checks) | Quarterly | Blocked: the CMS files sit behind the AMA license page. After the owner accepts it and saves the unzipped files: | `npm run ingest -- bill_refs --ptp-dir <folder>` | not loaded |
 
 ## Rules for every job
 

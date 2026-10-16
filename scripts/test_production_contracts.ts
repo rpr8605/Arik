@@ -5,6 +5,7 @@
 
 import { confirm, demoBillChecks, demoDocumentSource, demoExtractor, demoLetterDrafter, LUIS_EXTRACTION } from '../lib/production/demo';
 import { extractionProblems, findingsProblems, findingsTotal, letterProblems } from '../lib/production/contracts';
+import { realBillChecks } from '../lib/production/real/billChecks';
 import type { BillChecks, Extractor, LetterDrafter, LetterInput } from '../lib/production/types';
 
 let failures = 0;
@@ -44,6 +45,15 @@ export async function runContracts(label: string, impl: { extractor?: Extractor;
 
 (async () => {
   await runContracts('demo', { extractor: demoExtractor, checks: demoBillChecks, drafter: demoLetterDrafter });
+  // The real rules, with an in-memory reference set (TEST FIXTURE pair,
+  // not CMS data) in place of the database.
+  await runContracts('real', {
+    checks: realBillChecks(async () => ({
+      ptp: { version: 'test-fixture', pairs: [{ col1: '80053', col2: '80048', modifier: 0, effective: '2000-01-01', deleted: null }] },
+      mue: { version: 'mue-test', byCode: { '85025': { limit: 4, mai: 3 } } },
+    })),
+    drafter: demoLetterDrafter,
+  });
 
   // The contract checks themselves catch what they should.
   const bad = { ...LUIS_EXTRACTION, lines: [{ ...LUIS_EXTRACTION.lines[0], date: { value: '09/03/26', confidence: 2, box: { page: 1, x: 90, y: 10, w: 30, h: 2 } } }] };
