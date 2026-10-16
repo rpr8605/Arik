@@ -207,7 +207,18 @@ export function CallCard({
         <li>Prescriber&apos;s name and phone</li>
         <li>Household income, for assistance programs</li>
       </ul>
-      <p className="fact-note">Hours not on file. Check the program&apos;s site.</p>
+      {data.phone?.hours ? (
+        <p className="fact-note">Hours: {data.phone.hours}.</p>
+      ) : (
+        <p className="fact-note">Hours not on file. Check the program&apos;s site.</p>
+      )}
+      {data.phone?.sourceUrl ? (
+        <p className="fact-note">
+          <a href={data.phone.sourceUrl} target="_blank" rel="noopener noreferrer">
+            Number from the program&apos;s own page
+          </a>
+        </p>
+      ) : null}
       {receipt ? (
         <div className="receipt" role="status">
           <p className="receipt-badge">Coming soon, not sent</p>

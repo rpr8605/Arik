@@ -70,7 +70,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 `db/023_price_sources_defaults_false.sql` → `db/024_nadac_displayable.sql`
 → `db/025_pharmacies_ingest_runs.sql` → `db/026_rate_limits.sql`
 → `db/027_user_style_prefs.sql` → `db/028_demo_samples.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–028
+→ `db/029_program_phones.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–029
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -284,6 +285,12 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     shown as a bridge, never "Best path"). Script integrity, totals and
     the letter-stated denial deadline are tested by
     `test_walkthroughs.ts`; the click-through is a Playwright run.
+  - `programPhone.ts` — which program number to show (chat "Call the
+    program" + demo call card): only a number copied from the program's
+    own page (`support_phone`, cited by `support_phone_source_url`, hours
+    in `support_phone_hours`, db/029), only for a program the engine
+    offers, best path first; blocked/pending rows never lend one.
+    `test_program_phone.ts`.
   - `caseCard.ts` + `caseCards.ts` — the one place internal case status,
     type and field names become plain words (home cards, case header);
     `test_case_card.ts` proves no raw name reaches the screen.

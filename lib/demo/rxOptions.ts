@@ -3,6 +3,7 @@
 // the same code the chat uses (the AKS copay-card block, then the ranking
 // engine) for a sample patient's situation. No model call. Server-only.
 
+import { pickProgramPhone, type ProgramPhone } from '../programPhone';
 import { supabaseAdmin } from '../supabaseAdmin';
 import { rankSavingsPathsForDrug, type RankingResult } from '../ranking';
 import { partitionCopayCardsForSubject, resolveChatSubject, MANAGED_UNKNOWN_COVERAGE_REASON } from '../chatSubject';
@@ -15,7 +16,7 @@ export interface RxOptions {
   ranking: RankingResult | null;
   blockedReason: string | null;
   // A phone only ever comes from a cited program page (exploits.support_phone).
-  phone: { number: string; program: string; sourceUrl: string | null } | null;
+  phone: ProgramPhone | null;
 }
 
 export async function loadRxOptions(drugName: string, sample: SamplePatient): Promise<RxOptions> {
@@ -58,8 +59,7 @@ export async function loadRxOptions(drugName: string, sample: SamplePatient): Pr
     }
   }
 
-  const ranked = new Set((ranking?.ranked ?? []).map((r) => r.title));
-  const withPhone = (viable as any[]).find((e) => e.support_phone && ranked.has(e.title)) ?? null;
+  const phone = pickProgramPhone(ranking, viable);
   return {
     drug: drugName,
     found: true,
@@ -74,8 +74,6 @@ export async function loadRxOptions(drugName: string, sample: SamplePatient): Pr
       excludedPrices: [],
     },
     blockedReason,
-    phone: withPhone
-      ? { number: withPhone.support_phone, program: withPhone.title, sourceUrl: withPhone.sources?.url ?? null }
-      : null,
+    phone,
   };
 }

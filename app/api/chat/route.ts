@@ -33,6 +33,7 @@ import {
   subjectModelProfile,
 } from '@/lib/chatSubject';
 import { rankSavingsPathsForDrug } from '@/lib/ranking';
+import { pickProgramPhone } from '@/lib/programPhone';
 import { buildResponsePrompt, retrievedContextFor } from '@/lib/chatPrompt';
 
 // Created lazily per call - a module-level client crashes Next's
@@ -549,9 +550,9 @@ export async function POST(req: Request) {
     console.warn('[chat] grounding guard fell back to deterministic options (counts only)');
   }
 
-  // "Call the program" renders only when a cited row carries a real number.
-  const programPhone =
-    (viable ?? []).find((e: any) => e.support_phone)?.support_phone ?? null;
+  // "Call the program" renders only when a cited row carries a real number,
+  // and only for a program the engine offers (best path first).
+  const programPhone = pickProgramPhone(ranking, viable ?? [])?.number ?? null;
 
   const retrievedIds = viable.map((e: any) => e.id);
   await supabase().from('chat_messages').insert([
