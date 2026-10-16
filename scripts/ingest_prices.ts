@@ -75,6 +75,7 @@ function matchDrug(
 }
 
 const STAGING_CHUNK = 500;
+const WRITE_CHUNK = 1000;
 
 async function main() {
   const args = parseArgs(process.argv);
@@ -139,6 +140,16 @@ async function main() {
     throw new Error('fetch failed');
   }
   const { rows: pharmacyRows } = await client.query('select id, npi from pharmacies where npi is not null');
+  // NDC identity first (db/032 drug_ndcs, from the FDA NDC Directory): an
+  // exact NDC match beats any name match. Older databases without the
+  // table fall back to names only.
+  const drugByNdc = new Map<string, string>();
+  try {
+    const { rows } = await client.query('select ndc11, drug_id from drug_ndcs');
+    for (const r of rows as { ndc11: string; drug_id: string }[]) drugByNdc.set(r.ndc11, r.drug_id);
+  } catch {
+    await client.query('select 1');
+  }
   const pharmacyByNpi = new Map<string, string>(pharmacyRows.map((r: { id: string; npi: string }) => [r.npi, r.id]));
 
   // Per-record pipeline: normalize each record individually so every
@@ -163,7 +174,8 @@ async function main() {
     }
     acceptedCount++;
     const row = accepted[0];
-    const match = matchDrug(row.drug_name, drugs);
+    const byNdc = drugByNdc.get(row.ndc);
+    const match = byNdc ? { id: byNdc, name: row.drug_name } : matchDrug(row.drug_name, drugs);
     const pharmacyId = row.pharmacy_npi ? pharmacyByNpi.get(row.pharmacy_npi) ?? null : null;
     if ('error' in match) {
       runnerRejects.push({ reason: match.error, raw: record });
@@ -224,31 +236,63 @@ async function main() {
       stagingIds.push(...rows.map((r: { id: string }) => r.id));
     }
 
-    // 2. Upsert accepted rows on the db/022 natural key. dose stays NULL:
-    //    strength lives inside drug_name today and parsing it out is a
-    //    guessing game this runner deliberately does not play.
-    let upserted = 0;
+    // 2. Upsert accepted rows on the natural key, in batches. dose stays
+    //    NULL: strength lives inside drug_name today and parsing it out is
+    //    a guessing game this runner deliberately does not play. Weekly
+    //    files repeat a row until its price changes, so rows that share a
+    //    natural key are merged first (latest as-of wins): one INSERT may
+    //    not touch the same row twice.
+    const merged = new Map<string, (typeof upsertable)[number]>();
     for (const row of upsertable) {
-      await client.query(
+      const k = [row.source_id, row.drug_id, row.price_type, row.ndc, row.quantity, row.observed_at, row.pharmacy_id].join('|');
+      const prev = merged.get(k);
+      if (!prev || (row.as_of ?? '') > (prev.as_of ?? '')) merged.set(k, row);
+    }
+    const rowsToWrite = [...merged.values()];
+    let upserted = 0;
+    for (let i = 0; i < rowsToWrite.length; i += WRITE_CHUNK) {
+      const chunk = rowsToWrite.slice(i, i + WRITE_CHUNK);
+      const values: string[] = [];
+      const params: unknown[] = [];
+      for (const row of chunk) {
+        const k = params.length;
+        values.push(`($${k + 1}, $${k + 2}, null::int, $${k + 3}::numeric, $${k + 4}::numeric, $${k + 5}::uuid, $${k + 6}, $${k + 7}::date, $${k + 8}::date, $${k + 9}::uuid, $${k + 10}, $${k + 11}::date, $${k + 12})`);
+        params.push(row.drug_id, row.price_type, row.quantity, row.price, row.source_id, row.ndc, row.observed_at, row.expires_at, row.pharmacy_id,
+          row.pricing_unit ?? null, row.as_of ?? null, row.rate_class ?? null);
+      }
+      const r = await client.query(
         `insert into price_points
            (drug_id, price_type, supply_days, unit_count, price_usd,
-            price_source_id, ndc, observed_at, expires_at, pharmacy_id)
-         values ($1, $2, null, $3, $4, $5, $6, $7, $8, $9)
+            price_source_id, ndc, observed_at, expires_at, pharmacy_id,
+            pricing_unit, as_of_date, rate_class)
+         values ${values.join(', ')}
          on conflict (price_source_id, drug_id, price_type, ndc, supply_days, unit_count, observed_at, pharmacy_id)
          do update set price_usd = excluded.price_usd,
-                       expires_at = excluded.expires_at`,
-        [row.drug_id, row.price_type, row.quantity, row.price, row.source_id, row.ndc, row.observed_at, row.expires_at, row.pharmacy_id],
+                       expires_at = excluded.expires_at,
+                       pricing_unit = excluded.pricing_unit,
+                       rate_class = excluded.rate_class,
+                       as_of_date = greatest(price_points.as_of_date, excluded.as_of_date)`,
+        params,
       );
-      upserted++;
+      upserted += r.rowCount ?? 0;
     }
 
     // 3. Final staging statuses, one per raw record, with the reject
-    //    reason preserved where there is one.
-    for (let i = 0; i < raw.length; i++) {
-      const d = dispositions[i];
+    //    reason preserved where there is one (batched).
+    for (let i = 0; i < raw.length; i += WRITE_CHUNK) {
+      const ids: string[] = [];
+      const statuses: string[] = [];
+      const errors: (string | null)[] = [];
+      for (let j = i; j < Math.min(raw.length, i + WRITE_CHUNK); j++) {
+        ids.push(stagingIds[j]);
+        statuses.push(dispositions[j].staging);
+        errors.push(dispositions[j].reason ?? null);
+      }
       await client.query(
-        `update raw_price_ingest set status = $2, error = $3 where id = $1`,
-        [stagingIds[i], d.staging, d.reason ?? null],
+        `update raw_price_ingest r set status = u.status, error = u.error
+           from unnest($1::uuid[], $2::text[], $3::text[]) as u(id, status, error)
+          where r.id = u.id`,
+        [ids, statuses, errors],
       );
     }
 

@@ -53,7 +53,7 @@ async function main() {
   check('reject: zero price named', /unparseable or non-positive nadac_per_unit: "0"/.test(reasons));
   check('reject: bad date named', /unparseable effective_date: "not-a-date"/.test(reasons));
   check('reject: missing description named', /missing ndc_description/.test(reasons));
-  check('reject: non-EA unit named (never coerced)', /unsupported pricing_unit: "GM"/.test(reasons));
+  check('reject: a unit outside EA/ML/GM is named (never coerced)', /unsupported pricing_unit: "OZ"/.test(reasons));
   check('every rejection carries its raw payload', rejected.every((r) => r.raw != null));
 
   // --- bare-array fixture shape also accepted ---

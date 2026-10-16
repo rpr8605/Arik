@@ -36,6 +36,9 @@ import { rankSavingsPathsForDrug } from '@/lib/ranking';
 import { pickProgramPhone } from '@/lib/programPhone';
 import { createQuoteCache, getQuotes, quoteToPriceRow, unavailableNote } from '@/lib/pricing/quotes';
 import { enabledQuoteAdapters } from '@/lib/pricing/quoteSources';
+import { partitionPricesForConsent } from '@/lib/pricing/enforcement';
+import { benchmarkOnlyAnswer, type BenchmarkRow } from '@/lib/benchmarkAnswer';
+import { genericComponents } from '@/lib/drugdata/parse';
 
 // Per-instance quote cache (10 minutes).
 const QUOTE_CACHE = createQuoteCache();
@@ -215,7 +218,7 @@ async function retrieveContext(userId: string, intent: Intent, profile: any, man
     intent = { ...intent, drug_name: sample.medications[0].drug };
   }
 
-  let drugQuery = supabase().from('drugs').select('id, name, brand_names');
+  let drugQuery = supabase().from('drugs').select('id, name, brand_names, generic_name');
   if (intent.drug_name) {
     // Match generic name (case-insensitive) and brand_names array -
     // patients type brand names ("Jardiance") more often than generic
@@ -234,12 +237,15 @@ async function retrieveContext(userId: string, intent: Intent, profile: any, man
   const { data: drugs } = await drugQuery;
   const drugIds = (drugs ?? []).map((d) => d.id);
 
-  const [{ data: exploits }, { data: prices }, { data: accumulators }, { data: counterGuidance }, { data: priceSources }] =
+  const [{ data: exploits }, { data: prices }, { data: accumulators }, { data: counterGuidance }, { data: priceSources }, { data: benchmarks }] =
     await Promise.all([
       // db/017 added a second sources FK (aks/terms citations) — the embed
       // must name the FK or PostgREST rejects it as ambiguous.
       supabase().from('exploits').select('*, sources!exploits_source_id_fkey(*)').in('drug_id', drugIds).eq('status', 'active'),
-      supabase().from('price_points').select('*, sources(*), pharmacies(name, lat, lng)').in('drug_id', drugIds),
+      // Patient-price rows only. NADAC benchmarks (what pharmacies pay) never
+      // reach the model or the ranking; they are fetched below, latest week
+      // first, for the code-built benchmark-only answer.
+      supabase().from('price_points').select('*, sources(*), pharmacies(name, lat, lng)').in('drug_id', drugIds).neq('price_type', 'acquisition_benchmark'),
       supabase().from('accumulator_policies').select('*, sources(*)'),
       // Tiny reference table (9 rows), always included: counter rejections
       // are reported mid-conversation, not asked about by drug name.
@@ -247,9 +253,31 @@ async function retrieveContext(userId: string, intent: Intent, profile: any, man
       // db/022: consent/staleness rules for source-tagged price rows.
       // Tiny registry table (one row per adapter), always included.
       supabase().from('price_sources').select('id, name, enabled, max_staleness_hours, allow_patient_display, allow_ai_processing'),
+      supabase()
+        .from('price_points')
+        .select('price_usd, pricing_unit, as_of_date, observed_at, expires_at, price_source_id, price_type, rate_class')
+        .in('drug_id', drugIds)
+        .eq('price_type', 'acquisition_benchmark')
+        .order('as_of_date', { ascending: false })
+        .limit(300),
     ]);
 
-  return { profile, medications, exploits, prices, accumulators, counterGuidance, priceSources };
+  const drug = (drugs ?? [])[0] ?? null;
+  return { profile, medications, exploits, prices, accumulators, counterGuidance, priceSources, benchmarks, drug };
+}
+
+function benchmarkAnswerFor(context: any, drugName: string | null | undefined, lang: 'en' | 'es'): string | null {
+  type Row = BenchmarkRow & { price_source_id: string | null };
+  const rows: Row[] = context.benchmarks ?? [];
+  if (!context.drug || rows.length === 0) return null;
+  const sourcesById = Object.fromEntries((context.priceSources ?? []).map((p: any) => [p.id, p]));
+  const part = partitionPricesForConsent<Row>(rows, { sourcesById });
+  const shown: Row[] = [...part.allowed, ...part.excludedAi.map((x) => x.row)];
+  const d = context.drug;
+  // Brand when the drug's name isn't its own generic ("Ozempic" vs
+  // semaglutide); "atorvastatin" vs "Atorvastatin Calcium" is a generic.
+  const isBrand = !!d.generic_name && genericComponents(d.name).join('+') !== genericComponents(d.generic_name).join('+');
+  return benchmarkOnlyAnswer({ drug: d.name ?? drugName ?? '', isBrand, rows: shown, lang });
 }
 
 // --- Step 3: grounded response, only speaks from retrieved context ---
@@ -536,8 +564,16 @@ export async function POST(req: Request) {
   // (exploit or price point); general policy rows invite free-association.
   const nothingDrugSpecific =
     viable.length === 0 && (context.prices ?? []).length === 0;
+  // Benchmark-only (DRUG_DATA_TOP200.md Step 5): no patient-price path,
+  // but NADAC says what pharmacies pay. Answered in code: the figure is
+  // always "what pharmacies pay", never the patient's price. Display
+  // consent and staleness apply; AI consent doesn't (no model sees it).
+  const benchmarkText = nothingDrugSpecific ? benchmarkAnswerFor(context, intent.drug_name, lang) : null;
   if (nothingDrugSpecific) {
-    const response = compose(STRINGS.noData[lang](intent.drug_name) + blockedNote + unavailableNote(quotes.unavailable, lang), true);
+    const response = compose(
+      (benchmarkText ?? STRINGS.noData[lang](intent.drug_name)) + blockedNote + unavailableNote(quotes.unavailable, lang),
+      true,
+    );
     await supabase().from('chat_messages').insert([
       { session_id: sessionId, role: 'user', content: message },
       { session_id: sessionId, role: 'assistant', content: response, retrieved_exploit_ids: [] },

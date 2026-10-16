@@ -71,8 +71,9 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/025_pharmacies_ingest_runs.sql` → `db/026_rate_limits.sql`
 → `db/027_user_style_prefs.sql` → `db/028_demo_samples.sql`
 → `db/029_program_phones.sql` → `db/030_bmspaf_medicare_terms.sql`
-→ `db/031_pricing_s2_closeout.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–031
+→ `db/031_pricing_s2_closeout.sql` → `db/032_drug_data.sql`
+→ `db/033_imbruvica_negotiated_price.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–033
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -322,6 +323,24 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     NPIs. db/031 adds price_sources kind/mode, the pharmacy-aware natural
     key and `zip_centroids`. Tests: `test_http_client.ts`,
     `test_partner_readiness.ts`, `test_ingest_integration.mjs` (arik-pg).
+  - Drug data, top 200 (2026-10-16, docs/kimi/DRUG_DATA_TOP200.md):
+    `drugdata/parse.ts` (pure: Part D grouping of presentations into
+    drugs, salt-word/qualifier rules, FDA product match by active
+    substances, RxNorm, Census gazetteer), `scripts/load_drug_data.ts
+    partd|ndc|rxnorm|nadac|zips|size` (LOCAL only; downloads to `.data/`),
+    `scripts/export_seed.mjs` -> one idempotent SQL file merged by natural
+    keys, `scripts/apply_remote.mjs` (refuses anything but project
+    iwayoxmpbueneagdkpzj; dry run by default, `--confirm` to commit,
+    stops above 80% of the 500 MB free plan; `--local` to test on arik-pg).
+    Anything that doesn't match cleanly goes to `drug_data_review`, never
+    guessed. NADAC is ONE DATASET PER YEAR on data.medicaid.gov: the id is
+    looked up by title (`resolveNadacDatasetId`); units EA/ML/GM and the
+    brand/generic class are from the CMS field definitions. Freshness uses
+    `as_of_date` when a source has it (enforcement.ts). Benchmarks never
+    reach the model or ranking: chat fetches them separately and a drug
+    with no patient-price path gets the code-built answer in
+    `benchmarkAnswer.ts` ("what pharmacies pay", never "your price").
+    Tests: `test_drug_data.ts`, `test_benchmark_answer.ts`.
   - `pricing/adapter.ts` — source-agnostic `PriceSourceAdapter` contract
     (fetch/normalize → `NormalizedPrice`; rejects are logged, never
     coerced), `pricing/adapters/` (registry + `nadac.ts`; field mapping

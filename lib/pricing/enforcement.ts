@@ -35,6 +35,10 @@ export interface PriceRowLike {
   price_source_id?: string | null;
   observed_at?: string | null;
   expires_at?: string | null;
+  // The dated file the row was last seen in (db/032, NADAC's weekly
+  // as_of_date). When present it is the freshness date: an unchanged price
+  // re-confirmed this week is fresh even if it took effect months ago.
+  as_of_date?: string | null;
 }
 
 export interface ExcludedPrice<T> {
@@ -89,10 +93,11 @@ export function partitionPricesForConsent<T extends PriceRowLike>(
         continue;
       }
       const cutoff = new Date(now.getTime() - src.max_staleness_hours * 3_600_000);
-      if (new Date(row.observed_at) < cutoff) {
+      const seen = row.as_of_date ?? row.observed_at;
+      if (new Date(seen) < cutoff) {
         out.excludedStale.push({
           row,
-          reason: `observed ${row.observed_at}, older than source '${src.name}' max_staleness (${src.max_staleness_hours}h)`,
+          reason: `observed ${seen}, older than source '${src.name}' max_staleness (${src.max_staleness_hours}h)`,
         });
         continue;
       }

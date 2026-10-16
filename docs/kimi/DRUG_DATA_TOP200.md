@@ -80,3 +80,13 @@ Recommended answer shape for a drug with only a NADAC benchmark:
 ## Report (under 12 lines)
 
 Plan first: sources and URLs to verify, tables and migrations, sizes, the expected database size, and Ryan's decision on Step 5. Then STOP for "go."
+
+## Status (2026-10-16, local database)
+
+- Step 0 (S2): done, commit 6aba2e5.
+- Step 1: CMS Part D Spending by Drug, data year 2024, 3,625 Overall rows; presentations grouped into drugs ("Humira(Cf) Pen" + "Humira Pen" + "Humira(Cf)" = Humira); top 200 by summed spending; 22 matched existing drugs, 178 created.
+- Step 2: FDA NDC Directory (downloaded 2026-10-16): 186/200 drugs, 16,078 package NDCs, matched by active substances; spot check 9 of 9 sampled drugs with NDCs match the FDA files. 14 to review (vaccines, immune globulins, an insulin pump, Humulin, Velphoro, Bydureon, Prolastin). RxNorm (RxNav, release 05-Oct-2026): 195/200 linked, 5 to review.
+- Step 3: NADAC 2026 dataset (the id the adapter used was the 2021 dataset; fixed), as_of 2026-07-22 to 2026-10-14: 44,456 weekly rows -> 10,207 price rows, 0 rejected, 47s.
+- Step 4: the tenth 2026 negotiated price (Imbruvica, $9,319 for 30 days, CMS fact sheet) added (db/033). The brand-drug research CSV is not in the repo yet. 2027 negotiated prices take effect January 1, 2027 and are not loaded.
+- Step 5: recommended answer shape, built in code (lib/benchmarkAnswer.ts).
+- Step 6: export 13.4 MB SQL, adds about 26 MB; waiting on Ryan to apply db/031 to db/033 and run apply_remote.mjs.

@@ -75,6 +75,14 @@
       "list_price_2023_30day": 628,
       "negotiated_price_2026_30day": 295,
       "pct_reduction": 53
+    },
+    {
+      "name": "Imbruvica",
+      "manufacturer": "Pharmacyclics",
+      "drug_class": "blood cancers (BTK inhibitor)",
+      "list_price_2023_30day": 14934,
+      "negotiated_price_2026_30day": 9319,
+      "pct_reduction": 38
     }
   ],
   "high_volume_generics_watchlist": [

@@ -42,6 +42,9 @@ export interface NormalizedPrice {
   expires_at: string | null;      // ISO date after which the row must not be shown; null = governed by source max_staleness_hours
   source_id: string;              // price_sources.id (uuid) this row was ingested under
   source_record_ref: string;      // stable pointer back to the raw record (file row #, API id) for audit
+  pricing_unit?: 'EA' | 'ML' | 'GM';  // benchmark sources: what `price` is per (db/032)
+  as_of?: string | null;              // the dated file/week the row came from (db/032)
+  rate_class?: string | null;         // NADAC brand/generic class: 'B' | 'G' | 'B-ANDA' | 'B-BIO' (db/032)
 }
 
 export interface RejectedRecord {

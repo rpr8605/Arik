@@ -15,3 +15,7 @@ supabase/.temp/
 # Local-only files (never commit)
 dev-server.err.log
 scripts/dogfood_profile_run.mjs
+
+# Downloaded public data files (scripts/load_drug_data.ts)
+.data/
+.env.remote

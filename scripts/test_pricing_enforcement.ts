@@ -212,5 +212,15 @@ const patient = { insuranceType: 'uninsured', stateCode: null };
   check('PROOF: no trace of an AI-barred row anywhere in the prompt payload', !JSON.stringify(payload).includes('AI-BARRED-MARKER'));
 }
 
+// db/032: a weekly file re-confirming an old effective date keeps the row fresh.
+{
+  const src = { id: 'w', name: 'weekly', enabled: true, max_staleness_hours: 2160, allow_patient_display: true, allow_ai_processing: true } as any;
+  const old = { price_source_id: 'w', observed_at: '2025-01-15', as_of_date: '2026-10-14' };
+  const p1 = partitionPricesForConsent([old], { sourcesById: { w: src }, now: '2026-10-16T00:00:00Z' });
+  check('as_of_date (this week) keeps an old effective date fresh', p1.allowed.length === 1);
+  const p2 = partitionPricesForConsent([{ ...old, as_of_date: '2025-02-01' }], { sourcesById: { w: src }, now: '2026-10-16T00:00:00Z' });
+  check('an old as_of_date is stale', p2.excludedStale.length === 1 && /observed 2025-02-01/.test(p2.excludedStale[0].reason));
+}
+
 console.log(failures === 0 ? '\nPRICING ENFORCEMENT: ALL PASS' : `\nPRICING ENFORCEMENT: ${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
