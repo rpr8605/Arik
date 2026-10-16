@@ -5,6 +5,7 @@
 import { LETTER_FOOTER, type ConfirmedBill, type DraftLetter, type ExtractedDocument, type Finding, type LetterInput } from './types';
 
 const DOC_TYPES = ['itemized_bill', 'summary_bill', 'eob', 'denial_letter', 'insurance_card', 'pharmacy_receipt', 'unknown'];
+const EM_DASH = String.fromCharCode(0x2014);
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const inBox = (b: { page: number; x: number; y: number; w: number; h: number } | null) =>
   b == null || (b.page >= 1 && b.x >= 0 && b.y >= 0 && b.w > 0 && b.h > 0 && b.x + b.w <= 100.5 && b.y + b.h <= 100.5);
@@ -43,7 +44,7 @@ export function findingsProblems(findings: Finding[], bill: ConfirmedBill): stri
     if (!f.ruleId || !f.dataVersion) p.push(`${f.id}: missing rule or data version`);
     if (f.amountUsd != null && !(f.amountUsd > 0)) p.push(`${f.id}: amount must be positive or null`);
     if (/CFR|NCCI|MUE|§|section \d|\bPTP\b/i.test(f.plainText)) p.push(`${f.id}: rule names in patient text`);
-    if (f.plainText.includes('—')) p.push(`${f.id}: em dash`);
+    if (f.plainText.includes(EM_DASH)) p.push(`${f.id}: em dash`);
     // A finding's amount can never exceed what its lines charged.
     const charged = f.lines.reduce((t, i) => t + (bill.lines[i]?.chargeUsd ?? 0), 0);
     if (f.amountUsd != null && f.amountUsd > charged + 0.005) p.push(`${f.id}: amount ${f.amountUsd} exceeds its lines (${charged})`);
@@ -56,7 +57,7 @@ const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigi
 export function letterProblems(l: DraftLetter, input: LetterInput): string[] {
   const p: string[] = [];
   if (l.footer !== LETTER_FOOTER) p.push('footer is not the required text');
-  if ((l.subject + l.body).includes('—')) p.push('em dash');
+  if ((l.subject + l.body).includes(EM_DASH)) p.push('em dash');
   if (/\b(attorney|lawsuit|sue you|legal action|legal advice)\b/i.test(l.body)) p.push('legal-advice or threat wording');
   if (l.body.includes('{') || l.body.includes('}')) p.push('unfilled placeholder');
   // Grounding: every dollar amount in the letter is a bill line, a finding
