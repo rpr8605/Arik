@@ -57,6 +57,9 @@ function collectNumbers(value: unknown, set: Set<string>, key?: string): void {
   }
 }
 
+export const PERSONAL_ODDS_RE =
+  /\b\d+(?:\.\d+)?\s?%\s+(?:chance|likelihood|odds|probability|risk)\b[^.]*|\b(?:chance|odds|likelihood|probability)\s+(?:that\s+|of\s+)?your\s+(?:claim|appeal|request|prior auth\w*|bill)\b[^.]*|\byour\s+(?:claim|appeal|request|prior auth\w*)\s+(?:will|would|is going to|is likely to|is unlikely to|probably will)\s+(?:be\s+)?(?:denied|approved|rejected|overturned|upheld)\b/gi;
+
 export function buildAllowedFacts(input: {
   retrievedContext: unknown;
   profile: unknown;
@@ -107,6 +110,13 @@ export function findUnmatchedClaims(text: string, facts: GuardedFacts): string[]
   // 4. Known program names from OTHER drugs (foreign to this context).
   const normText = norm(text);
   for (const f of facts.foreignNames) if (normText.includes(f)) bad.add(`program not in data: ${f}`);
+
+  // 5. Insurer or plan statistics turned into a personal prediction
+  // (free_data_loaders.md Part A). Denial and approval rates describe a
+  // payer, never one person's claim: "a 20% chance your claim is denied"
+  // or "your appeal will be approved" is rejected even when the number
+  // itself is grounded.
+  for (const m of text.matchAll(PERSONAL_ODDS_RE)) bad.add(`personal prediction: ${m[0].trim()}`);
 
   return [...bad];
 }

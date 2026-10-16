@@ -73,7 +73,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/029_program_phones.sql` → `db/030_bmspaf_medicare_terms.sql`
 → `db/031_pricing_s2_closeout.sql` → `db/032_drug_data.sql`
 → `db/033_imbruvica_negotiated_price.sql` → `db/034_routing_partners.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–034
+→ `db/035_denial_data.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–035
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -352,6 +353,17 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     enable|purge`, `disclosure.ts` + `app/how-we-route`. db/034:
     `compensation_to_arik` check = 'none', enabling needs a data use
     agreement date. Tests: `test_routing.ts`, `test_routing_db.mjs`.
+  - `data/` — free data loaders Part A (2026-10-16): `denial.ts` (pure:
+    TiC PUF values `*`/`**`/`***`/`N/A` -> null + flag, per-issuer
+    aggregation, prior auth template validation, summaries that never
+    read as a personal prediction), `xlsx.ts` + `csv.ts` (small pure
+    readers), `denialData.ts` (`getInsurerDenialStats`,
+    `getPriorAuthMetrics`: values + source label/URL/data year, or "no
+    data"). `npm run ingest -- tic_puf | prior_auth --file <csv>` goes
+    through `scripts/ingest.ts` (price sources still go to
+    ingest_prices.ts); runs log to `ingest_runs.dataset` (db/035). The
+    grounding guard's rule 5 rejects "X% chance your claim is denied"
+    style text. Test: `test_denial_data.ts`.
   - `pricing/adapter.ts` — source-agnostic `PriceSourceAdapter` contract
     (fetch/normalize → `NormalizedPrice`; rejects are logged, never
     coerced), `pricing/adapters/` (registry + `nadac.ts`; field mapping
