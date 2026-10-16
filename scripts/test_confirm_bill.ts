@@ -56,5 +56,9 @@ if (prev == null) delete process.env.DOCUMENT_READER;
 else process.env.DOCUMENT_READER = prev;
 check('the on-server reader is the default; the model reader only when asked for by name', d1 === 'on-server' && d2 === 'model' && d3 === 'on-server');
 
+const gfeOk = parseConfirmedBill({ header: {}, lines: [], goodFaithEstimateUsd: 1250.5 });
+check('good faith estimate: kept when valid, null when blank', 'bill' in gfeOk && gfeOk.bill.goodFaithEstimateUsd === 1250.5 && 'bill' in blanks && blanks.bill.goodFaithEstimateUsd === null);
+check('good faith estimate: negative or text refused', 'error' in parseConfirmedBill({ header: {}, lines: [], goodFaithEstimateUsd: -5 }) && 'error' in parseConfirmedBill({ header: {}, lines: [], goodFaithEstimateUsd: 'lots' }));
+
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 process.exit(failures ? 1 : 0);

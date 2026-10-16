@@ -7,6 +7,10 @@ import { supabaseAdmin } from '../supabaseAdmin';
 import { findingsTotal } from './contracts';
 import { letterHash } from '../letters/freeze';
 import { realBillChecks } from './real/billChecks';
+import { getCaseManagedPatient, getChatProfile } from '../chatSession';
+import { resolveChatSubject } from '../chatSubject';
+import { coverageFrom } from '../rules/cashVsInsurance';
+import type { BillSituation } from '../rules/bills/rights';
 import { codeLetterDrafter, modelLetterDrafter } from './real/letterDrafter';
 import type { ConfirmedBill, Finding, LetterType } from './types';
 
@@ -39,11 +43,20 @@ export async function getCaseDocument(caseId: string, documentId: string) {
 
 // Store the confirmed copy, run the checks on it, and replace this
 // document's findings with the new set (re-confirming re-runs).
+// Whose coverage the rights checks use: the case's subject, as in chat
+// (a caregiver's case is about the managed patient, whose coverage is
+// unknown today, so the checks say "if").
+async function billSituation(userId: string, caseId: string, bill: ConfirmedBill): Promise<BillSituation> {
+  const [profile, managedPatient] = await Promise.all([getChatProfile(userId), getCaseManagedPatient(caseId)]);
+  const subject = resolveChatSubject({ userProfile: profile, managedPatient });
+  return { coverage: coverageFrom(subject.insuranceType), goodFaithEstimateUsd: bill.goodFaithEstimateUsd ?? null };
+}
+
 export async function confirmAndReview(userId: string, caseId: string, documentId: string, bill: ConfirmedBill): Promise<{ findings: Finding[]; totalUsd: number }> {
   const sb = supabaseAdmin();
   const { error: upErr } = await sb.from('uploaded_documents').update({ confirmed_data: bill, confirmed_at: bill.confirmedAt }).eq('id', documentId).eq('case_id', caseId);
   if (upErr) throw upErr;
-  const findings = await realBillChecks().run(bill);
+  const findings = await realBillChecks().run(bill, await billSituation(userId, caseId, bill));
   const { error: delErr } = await sb.from('bill_audit_findings').delete().eq('bill_document_id', documentId).eq('case_id', caseId);
   if (delErr) throw delErr;
   if (findings.length) {
@@ -60,6 +73,7 @@ export async function confirmAndReview(userId: string, caseId: string, documentI
         line_indexes: f.lines,
         tone: f.tone,
         data_version: f.dataVersion,
+        ref_amounts_usd: f.refsUsd ?? null,
         confidence: f.tone === 'wrong' ? 'high' : 'medium',
       })),
     );
@@ -71,7 +85,7 @@ export async function confirmAndReview(userId: string, caseId: string, documentI
 async function storedFindings(caseId: string, documentId: string): Promise<Finding[]> {
   const { data, error } = await supabaseAdmin()
     .from('bill_audit_findings')
-    .select('finding_key, line_indexes, tone, disputed_amount_usd, description, finding_type, data_version, status')
+    .select('finding_key, line_indexes, tone, disputed_amount_usd, description, finding_type, data_version, ref_amounts_usd, status')
     .eq('case_id', caseId)
     .eq('bill_document_id', documentId)
     .neq('status', 'dismissed');
@@ -84,6 +98,7 @@ async function storedFindings(caseId: string, documentId: string): Promise<Findi
     plainText: r.description,
     ruleId: r.finding_type,
     dataVersion: r.data_version,
+    ...(r.ref_amounts_usd ? { refsUsd: (r.ref_amounts_usd as unknown[]).map(Number) } : {}),
   }));
 }
 

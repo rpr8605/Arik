@@ -18,7 +18,7 @@ const box = (v: unknown): Box | null | undefined => {
 };
 
 export function parseConfirmedBill(body: unknown, now = new Date()): { bill: ConfirmedBill } | { error: string } {
-  const b = body as { header?: Record<string, unknown>; lines?: unknown[] } | null;
+  const b = body as { header?: Record<string, unknown>; lines?: unknown[]; goodFaithEstimateUsd?: unknown } | null;
   if (!b || typeof b !== 'object' || !b.header || !Array.isArray(b.lines)) return { error: 'header and lines are required' };
   if (b.lines.length > MAX_LINES) return { error: `at most ${MAX_LINES} lines` };
   const h = b.header;
@@ -51,7 +51,9 @@ export function parseConfirmedBill(body: unknown, now = new Date()): { bill: Con
     if (badField) return { error: `line ${i} ${badField[0]} is not valid` };
     lines.push(line as ConfirmedBill['lines'][number]);
   }
-  return { bill: { confirmedAt: now.toISOString(), header: header as ConfirmedBill['header'], lines } };
+  const goodFaithEstimateUsd = num(b.goodFaithEstimateUsd, 10_000_000);
+  if (goodFaithEstimateUsd === undefined) return { error: 'goodFaithEstimateUsd is not valid' };
+  return { bill: { confirmedAt: now.toISOString(), header: header as ConfirmedBill['header'], lines, goodFaithEstimateUsd } };
 }
 
 // What the "Here's what I read" screen starts from: the reader's output as

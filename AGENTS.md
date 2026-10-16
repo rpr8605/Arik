@@ -75,8 +75,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/033_imbruvica_negotiated_price.sql` → `db/034_routing_partners.sql`
 → `db/035_denial_data.sql` → `db/036_policy_documents.sql`
 → `db/037_program_card_details.sql` → `db/038_bill_review.sql`
-→ `db/039_bill_reference_data.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–039
+→ `db/039_bill_reference_data.sql` → `db/040_bill_rights_checks.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–040
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -193,9 +193,17 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   `cases/[id]/letters/[letterId]` (403 in DEMO_MODE). Screen:
   `app/cases/[id]/BillReview.tsx`. Tests: test_layout, test_bill_checks,
   test_letters, test_confirm_bill; e2e `scripts/synth_docs/e2e.ts`;
-  live `smoke_bill_review.mjs`. Pending: No Surprises and charity-care
-  checks (rule text not yet verified and quoted), appeal and records
-  letters (they come with the denial flow).
+  live `smoke_bill_review.mjs`. Patient rights checks (2026-10-16,
+  `lib/rules/bills/rights.ts`, quotes in
+  docs/research/no_surprises_charity_care_verification.md): No Surprises
+  emergency and ancillary limits (work/marketplace plans only; "if" when
+  coverage is unknown), the good faith estimate $400 dispute threshold
+  (the patient enters the estimate; the amounts a finding names travel as
+  `refsUsd` / db/040 `ref_amounts_usd` so letters pass grounding), and
+  nonprofit hospital financial assistance (240-day application window).
+  All "ask", never assumed; coverage comes from the case subject as in
+  chat. Test: test_bill_rights. Pending: appeal and records letters (they
+  come with the denial flow).
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure

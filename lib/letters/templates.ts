@@ -56,6 +56,22 @@ export function findingRequest(f: Finding, bill: ConfirmedBill): string {
         : `Please explain the ${money(l.chargeUsd ?? 0)} charge for ${named(l).charAt(0).toLowerCase() + named(l).slice(1)}${on}.`;
     case 'price_benchmark':
       return `Please explain how the ${money(l.chargeUsd ?? 0)} charge for ${named(l).charAt(0).toLowerCase() + named(l).slice(1)}${on} was set.`;
+    // Patient rights (lib/rules/bills/rights.ts). The bill can't show
+    // network status or nonprofit status, so these ask and cite the rule.
+    case 'nsa_emergency':
+      return `This bill includes emergency care${on}. If any of it was treated as out of network, federal rules (45 CFR 149.410) limit what I can be billed to my in-network cost sharing. Please confirm the claim was sent to my insurance, and bill me no more than the cost sharing on my plan's explanation of benefits.`;
+    case 'nsa_ancillary':
+      return `${named(l)}${ls.length > 1 ? ' and the related services on this bill were' : ' was'} provided at a facility. If you are outside my plan's network and the facility is in it, federal rules (45 CFR 149.420) limit what I can be billed to my in-network cost sharing, and a signed waiver does not apply to these services. Please confirm your network status and bill me no more than my in-network cost sharing.`;
+    case 'gfe_over': {
+      const [gfe, billed, over] = f.refsUsd ?? [];
+      return gfe != null && billed != null && over != null
+        ? `I received a good faith estimate of ${money(gfe)} for this care. The charges on this bill, ${money(billed)}, are ${money(over)} more than that estimate. Please send a corrected bill or explain the difference. I may use the federal patient-provider dispute process (45 CFR 149.620).`
+        : 'Please explain how the charges on this bill compare with the good faith estimate I was given.';
+    }
+    case 'gfe_ask':
+      return 'Please send me a copy of any good faith estimate you gave me for this care.';
+    case 'financial_assistance':
+      return 'Please send me your financial assistance policy, its plain language summary and an application. While I apply, please hold all collection activity on this account.';
     default:
       return `Please review the charge for ${named(l).charAt(0).toLowerCase() + named(l).slice(1)}${on}.`;
   }

@@ -43,6 +43,7 @@ export function findingsProblems(findings: Finding[], bill: ConfirmedBill): stri
     if (!['wrong', 'ask'].includes(f.tone)) p.push(`${f.id}: bad tone`);
     if (!f.ruleId || !f.dataVersion) p.push(`${f.id}: missing rule or data version`);
     if (f.amountUsd != null && !(f.amountUsd > 0)) p.push(`${f.id}: amount must be positive or null`);
+    if (f.refsUsd && !f.refsUsd.every((x) => Number.isFinite(x) && x > 0)) p.push(`${f.id}: named amounts must be positive`);
     if (/CFR|NCCI|MUE|§|section \d|\bPTP\b/i.test(f.plainText)) p.push(`${f.id}: rule names in patient text`);
     if (f.plainText.includes(EM_DASH)) p.push(`${f.id}: em dash`);
     // A finding's amount can never exceed what its lines charged.
@@ -61,9 +62,10 @@ export function letterProblems(l: DraftLetter, input: LetterInput): string[] {
   if (/\b(attorney|lawsuit|sue you|legal action|legal advice)\b/i.test(l.body)) p.push('legal-advice or threat wording');
   if (l.body.includes('{') || l.body.includes('}')) p.push('unfilled placeholder');
   // Grounding: every dollar amount in the letter is a bill line, a finding
-  // amount or a bill total.
+  // amount, an amount a finding names (refsUsd) or a bill total.
   const allowed = new Set<string>([
     ...input.findings.map((f) => f.amountUsd).filter((x): x is number => x != null).map(money),
+    ...input.findings.flatMap((f) => f.refsUsd ?? []).map(money),
     ...input.bill.lines.map((x) => x.chargeUsd).filter((x): x is number => x != null).map(money),
     ...[input.bill.header.totalChargesUsd, input.bill.header.amountDueUsd].filter((x): x is number => x != null).map(money),
   ]);

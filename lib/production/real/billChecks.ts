@@ -1,4 +1,5 @@
 // The real BillChecks: the pure rules (lib/rules/bills/checks.ts) with the
+// patient rights checks (lib/rules/bills/rights.ts) and the
 // Medicare reference rows for just the codes on this bill (db/039). A
 // dataset that isn't loaded is left out, and its check finds nothing:
 // no reference, no claim.
@@ -6,6 +7,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../../supabaseAdmin';
 import { billSetting, runBillChecks, type BillRefs, type Setting } from '../../rules/bills/checks';
+import { runRightsChecks, type BillSituation } from '../../rules/bills/rights';
 import type { BillChecks, ConfirmedBill } from '../types';
 
 export type RefsLoader = (codes: string[], setting: Setting) => Promise<BillRefs>;
@@ -41,9 +43,11 @@ export function dbRefsLoader(db: () => SupabaseClient = supabaseAdmin): RefsLoad
 export function realBillChecks(loadRefs: RefsLoader = dbRefsLoader()): BillChecks {
   return {
     name: 'rules-v1',
-    async run(bill: ConfirmedBill) {
+    // Without a situation, coverage is unknown: the rights checks then say
+    // "if" and never assume a plan type.
+    async run(bill: ConfirmedBill, situation: BillSituation = { coverage: 'unknown' }) {
       const codes = [...new Set(bill.lines.map((l) => l.code).filter((c): c is string => !!c))];
-      return runBillChecks(bill, await loadRefs(codes, billSetting(bill)));
+      return [...runBillChecks(bill, await loadRefs(codes, billSetting(bill))), ...runRightsChecks(bill, situation)];
     },
   };
 }

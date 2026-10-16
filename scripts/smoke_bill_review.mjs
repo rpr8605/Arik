@@ -2,7 +2,7 @@
 // upload (on-server reader) -> GET the reading -> "Looks right" -> findings
 // stored -> dispute letter -> edit -> freeze -> edit refused -> PDF ->
 // account-deletion order holds with a frozen letter. Self-cleaning.
-// Needs: a non-demo dev server (DEMO_MODE=false), db/038 + db/039 applied,
+// Needs: a non-demo dev server (DEMO_MODE=false), db/038 to db/040 applied,
 // `npm run ingest -- bill_refs` on the same database, and the synthetic
 // library (`npx tsx scripts/synth_docs/generate.ts`).
 //   node scripts/smoke_bill_review.mjs
@@ -116,6 +116,17 @@ try {
   check('letter: writing again makes version 2', second.status === 201 && second.json.letter.version === 2);
   const ghost = await api(`/api/cases/${kase.id}/letters/00000000-0000-0000-0000-000000000000`);
   check('letter: a letter that is not in this case is a 404', ghost.status === 404);
+
+  // Patient rights checks (lib/rules/bills/rights.ts): a good faith estimate
+  // $400+ under the bill gives a dispute ask whose named amounts are stored
+  // (db/040) so the letter can cite them and still pass grounding.
+  const hospital = conf.json.findings.some((f) => f.ruleId === 'financial_assistance');
+  check('rights: a hospital bill gets the financial assistance ask', !/hospital|medical center/i.test(truth.provider) || hospital, truth.provider);
+  const withGfe = await api(`/api/cases/${kase.id}/documents/${docId}/confirm`, { method: 'POST', body: JSON.stringify({ ...reading.json.draft, goodFaithEstimateUsd: 1 }) });
+  const gfeRow = (await pgClient.query(`select ref_amounts_usd from bill_audit_findings where bill_document_id = $1 and finding_type = 'gfe_over'`, [docId])).rows[0];
+  check('rights: estimate far under the bill -> dispute ask, its three amounts stored', withGfe.json?.findings?.some((f) => f.ruleId === 'gfe_over') && gfeRow?.ref_amounts_usd?.length === 3, JSON.stringify(gfeRow));
+  const gfeLetter = await api(`/api/cases/${kase.id}/letters`, { method: 'POST', body: JSON.stringify({ documentId: docId, type: 'billing_dispute' }) });
+  check('rights: the dispute letter cites the estimate rule and passes grounding', gfeLetter.status === 201 && /45 CFR 149\.620/.test(gfeLetter.json.letter.body) && /\$1\.00/.test(gfeLetter.json.letter.body), `${gfeLetter.status} ${JSON.stringify(gfeLetter.json).slice(0, 200)}`);
 
   // "Delete everything" still works with a frozen letter in place.
   const del = await api('/api/privacy', { method: 'DELETE' });

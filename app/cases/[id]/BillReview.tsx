@@ -39,6 +39,7 @@ export function BillReview({ caseId, documentId, reading }: { caseId: string; do
   const [total, setTotal] = useState(0);
   const [letter, setLetter] = useState<Letter | null>(null);
   const [phone, setPhone] = useState('');
+  const [estimate, setEstimate] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +60,7 @@ export function BillReview({ caseId, documentId, reading }: { caseId: string; do
     const body = {
       header: { ...header, totalChargesUsd: num(header.totalChargesUsd), amountDueUsd: num(header.amountDueUsd) },
       lines: lines.map((l) => ({ date: l.date || null, code: l.code || null, description: l.description || null, units: l.units ? Number(l.units) : null, chargeUsd: num(l.chargeUsd) })),
+      goodFaithEstimateUsd: num(estimate),
     };
     const res = await api(`/api/cases/${caseId}/documents/${documentId}/confirm`, { method: 'POST', body: JSON.stringify(body) });
     const json = await res.json();
@@ -136,6 +138,10 @@ export function BillReview({ caseId, documentId, reading }: { caseId: string; do
               </tbody>
             </table>
           </div>
+          <label style={{ display: 'block', marginTop: '0.75rem' }}>
+            If this provider gave you a good faith estimate before your care, its amount ($) (optional)
+            <input style={cell} inputMode="decimal" value={estimate} onChange={(e) => setEstimate(e.target.value)} />
+          </label>
           <div className="actions" style={{ marginTop: '0.75rem' }}>
             <button type="button" style={big} onClick={() => setLines([...lines, { date: '', code: '', description: '', units: '1', chargeUsd: '' }])}>Add a line</button>
             <button type="button" style={big} disabled={busy} onClick={confirm}>{busy ? 'Checking...' : 'Looks right'}</button>

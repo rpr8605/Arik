@@ -4,6 +4,8 @@
 // by side (lib/production/demo.ts, lib/production/real/*) and the same
 // contract tests for both (scripts/test_production_contracts.ts).
 
+import type { BillSituation } from '../rules/bills/rights';
+
 // ---------- Get the document ----------
 
 export interface SourceDocument {
@@ -82,6 +84,7 @@ export interface ConfirmedBill {
   confirmedAt: string;
   header: { [K in keyof ExtractedHeader]: ExtractedHeader[K]['value'] };
   lines: { date: string | null; code: string | null; description: string | null; units: number | null; chargeUsd: number | null; box: Box | null }[];
+  goodFaithEstimateUsd?: number | null;   // entered by the patient, if they were given one
 }
 
 // ---------- Find problems ----------
@@ -94,11 +97,12 @@ export interface Finding {
   plainText: string;          // plain words, no rule names
   ruleId: string;             // e.g. 'duplicate_charge', 'ncci_ptp'
   dataVersion: string;        // e.g. 'ncci-ptp-2026Q4', 'builtin'
+  refsUsd?: number[];         // other dollar figures named in the text (e.g. a good faith estimate), so a letter may cite them
 }
 
 export interface BillChecks {
   readonly name: string;
-  run(bill: ConfirmedBill): Promise<Finding[]>;
+  run(bill: ConfirmedBill, situation?: BillSituation): Promise<Finding[]>;
 }
 
 // ---------- Write the letter ----------
