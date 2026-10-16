@@ -20,8 +20,12 @@ export function sourceLabel(title: string | null | undefined): string {
 
 // The best ongoing path: the engine's winner. One-time offers live in
 // ranking.bridges and are shown after the ongoing options.
+// Returns the row inside `ranked` (the card tags it by identity; the
+// winner object itself is a separate copy once it crosses JSON).
 export function bestOngoing(data: RxOptions): RankedPathway | null {
-  return data.ranking?.winner ?? data.ranking?.ranked[0] ?? null;
+  const r = data.ranking;
+  if (!r) return null;
+  return r.ranked.find((p) => p.title === r.winner?.title) ?? r.ranked[0] ?? null;
 }
 
 // A one-time offer (a free trial fill) is a bridge, not a monthly price,

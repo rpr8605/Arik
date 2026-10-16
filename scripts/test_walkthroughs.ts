@@ -9,6 +9,9 @@ import { BILL_FLOW, DENIAL_DEADLINE, DENIAL_FLOW, flowScript, rxFlow } from '../
 import { findingsTotal, renderTotal, validateScript, type Script, type Step } from '../lib/walkthrough/script';
 import { LETTERS, LETTER_FOOTER, fillLetter } from '../lib/walkthrough/letters';
 import { SAMPLE_DOCS, availableSampleDocs } from '../lib/demo/sampleDocs';
+import { rankPathways } from '../lib/ranking';
+import { bestOngoing } from '../app/walk/RxCards';
+import type { RxOptions } from '../lib/demo/rxOptions';
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = '') {
@@ -88,6 +91,25 @@ check('all six sample documents are available', availableSampleDocs().length ===
 check('unknown flow -> null (page 404s)', flowScript('nope') === null);
 check('rx flow with a preset drug skips the question', rxFlow('james', 'Eliquis').start === 'drug_Eliquis' && rxFlow('maria').start === 'intro');
 check('no step in any flow has em dashes', scripts.every((s) => !JSON.stringify(s).includes('—')));
+
+// "Best path" tag: the prescription card tags the row that is identical to
+// bestOngoing(). After the API's JSON round-trip the engine's winner is a
+// separate object, so bestOngoing must hand back the row inside ranked.
+const src = { title: 'S', url: null, last_verified_at: null };
+const rk = rankPathways({
+  exploits: [
+    { exploit_type: 'free_trial', title: 'Trial', status: 'active', verification_status: 'verified_current', patient_price_type: 'flat', patient_price_floor: 0, eligibility_criteria: { one_time: true }, sources: src },
+    { exploit_type: 'direct_to_patient_program', title: 'DTP', status: 'active', verification_status: 'verified_current', patient_price_type: 'flat', patient_price_floor: 345, eligibility_criteria: { insurance_required: false }, sources: src },
+  ],
+  pricePoints: [],
+  stateRow: null,
+  banApplies: false,
+  patient: { insuranceType: 'uninsured', stateCode: 'TX' },
+});
+const wire = JSON.parse(JSON.stringify({ drug: 'X', found: true, ranking: rk, blockedReason: null, phone: null })) as RxOptions;
+const best = bestOngoing(wire);
+check('rx card: "Best path" row is the DTP and is the same object as in ranked (survives JSON)', best?.title === 'DTP' && wire.ranking!.ranked.includes(best!));
+check('rx card: the trial is a bridge, never the best path', !wire.ranking!.ranked.some((p) => p.title === 'Trial') && wire.ranking!.bridges[0]?.title === 'Trial');
 
 console.log(failures === 0 ? '\nWALKTHROUGHS: ALL PASS' : `\nWALKTHROUGHS: ${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
