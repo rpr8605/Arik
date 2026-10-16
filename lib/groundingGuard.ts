@@ -14,6 +14,7 @@
 export interface GuardedFacts {
   numbers: Set<string>;   // every figure the model may cite (commas stripped)
   foreignNames: string[]; // normalized known program titles NOT in this context
+  coverage?: string | null; // 'medicaid' turns on rule 6 (no cash advice)
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -60,11 +61,15 @@ function collectNumbers(value: unknown, set: Set<string>, key?: string): void {
 export const PERSONAL_ODDS_RE =
   /\b\d+(?:\.\d+)?\s?%\s+(?:chance|likelihood|odds|probability|risk)\b[^.]*|\b(?:chance|odds|likelihood|probability)\s+(?:that\s+|of\s+)?your\s+(?:claim|appeal|request|prior auth\w*|bill)\b[^.]*|\byour\s+(?:claim|appeal|request|prior auth\w*)\s+(?:will|would|is going to|is likely to|is unlikely to|probably will)\s+(?:be\s+)?(?:denied|approved|rejected|overturned|upheld)\b/gi;
 
+export const MEDICAID_CASH_RE =
+  /\b(?:pay(?:ing)?|use|go with|choose)\s+(?:the\s+)?(?:cash(?:\s+price)?|out[- ]of[- ]pocket|without (?:your )?(?:insurance|medicaid))\b[^.]*/gi;
+
 export function buildAllowedFacts(input: {
   retrievedContext: unknown;
   profile: unknown;
   knownPrograms?: string[];  // every exploit title in the DB
   allowedTitles?: string[];  // titles present in this case's context
+  coverage?: string | null;  // cashVsInsurance Coverage: 'medicaid' turns on rule 6
 }): GuardedFacts {
   const numbers = new Set<string>();
   collectNumbers(input.retrievedContext ?? null, numbers);
@@ -73,7 +78,7 @@ export function buildAllowedFacts(input: {
   const foreignNames = (input.knownPrograms ?? [])
     .map(titleFrag)
     .filter((f) => f.length > 6 && !allowed.has(f));
-  return { numbers, foreignNames: [...new Set(foreignNames)] };
+  return { numbers, foreignNames: [...new Set(foreignNames)], coverage: input.coverage ?? null };
 }
 
 export function findUnmatchedClaims(text: string, facts: GuardedFacts): string[] {
@@ -117,6 +122,13 @@ export function findUnmatchedClaims(text: string, facts: GuardedFacts): string[]
   // or "your appeal will be approved" is rejected even when the number
   // itself is grounded.
   for (const m of text.matchAll(PERSONAL_ODDS_RE)) bad.add(`personal prediction: ${m[0].trim()}`);
+
+  // 6. Cash advice to a Medicaid patient (lib/rules/cashVsInsurance.ts):
+  // the decision is made in code ("ask the pharmacy to bill Medicaid
+  // first"); model text telling them to pay cash is rejected.
+  if (facts.coverage === 'medicaid') {
+    for (const m of text.matchAll(MEDICAID_CASH_RE)) bad.add(`cash advice for a Medicaid patient: ${m[0].trim()}`);
+  }
 
   return [...bad];
 }

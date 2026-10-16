@@ -5,6 +5,8 @@ import type { RxOptions } from '@/lib/demo/rxOptions';
 import type { RankedPathway } from '@/lib/ranking';
 import type { SamplePatient } from '@/lib/demo/samples';
 import { newRef, type DemoReceipt } from './demoJobs';
+import { buildCounterCard, decisionForPath } from '@/lib/counterCard';
+import { decisionText } from '@/lib/rules/cashVsInsurance';
 
 const usd = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -25,7 +27,8 @@ export function sourceLabel(title: string | null | undefined): string {
 export function bestOngoing(data: RxOptions): RankedPathway | null {
   const r = data.ranking;
   if (!r) return null;
-  return r.ranked.find((p) => p.title === r.winner?.title) ?? r.ranked[0] ?? null;
+  // No winner means no best path (a list price or a terms-only program is never promoted).
+  return r.winner ? r.ranked.find((p) => p.title === r.winner!.title) ?? null : null;
 }
 
 // A one-time offer (a free trial fill) is a bridge, not a monthly price,
@@ -46,7 +49,64 @@ function checked(d: string | null | undefined): string {
 // The results card: Arik's real sourced options for this drug and this
 // patient's situation, in the ranking engine's order. Nothing here is
 // scripted; if a price isn't loaded the card says so.
-export function RxResults({ data }: { data: RxOptions }) {
+// The cash-vs-insurance line and, for a cash or discount-card best path,
+// the "At the counter" card (lib/counterCard.ts). Built in code.
+function CashDecision({ data, insuranceType }: { data: RxOptions; insuranceType: string | null }) {
+  const [lang, setLang] = useState<'en' | 'es'>('en');
+  const best = bestOngoing(data);
+  if (!best) return null;
+  const program = (data.programs ?? []).find((p) => p.title === best.title) ?? null;
+  const decision = decisionForPath(best, program, insuranceType);
+  if (!decision) return null;
+  const card = buildCounterCard({ path: best, program, decision, lang });
+  return (
+    <div className="cash-decision">
+      <p className="fact-note">{decisionText(decision, lang)}</p>
+      {card ? (
+        <div className="counter-card" lang={lang}>
+          <div className="lang-switch" role="group" aria-label="Card language">
+            <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
+              English
+            </button>
+            <button type="button" aria-pressed={lang === 'es'} onClick={() => setLang('es')}>
+              Español
+            </button>
+          </div>
+          <h3>{card.heading}</h3>
+          <blockquote className="call-script">{card.say}</blockquote>
+          {card.cardLines.length ? (
+            <ul className="fact-list">
+              {card.cardLines.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+          ) : null}
+          {card.getNumbers ? (
+            <p className="fact-note">
+              {card.getNumbers.url ? (
+                <a href={card.getNumbers.url} target="_blank" rel="noopener noreferrer">
+                  {card.getNumbers.text}
+                </a>
+              ) : (
+                card.getNumbers.text
+              )}
+            </p>
+          ) : null}
+          <p className="fact-note">{card.where}</p>
+          <p className="fact-note">{card.when}</p>
+          {card.caveats.map((c) => (
+            <p key={c} className="fact-note">
+              {c}
+            </p>
+          ))}
+          <p className="fact-note">{card.ifDifferent}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function RxResults({ data, insuranceType = null }: { data: RxOptions; insuranceType?: string | null }) {
   const r = data.ranking;
   if (!data.found || !r || (r.ranked.length === 0 && r.bridges.length === 0 && r.pendingVerification.length === 0 && r.blocked.length === 0)) {
     return (
@@ -109,6 +169,7 @@ export function RxResults({ data }: { data: RxOptions }) {
         <p className="rx-pending">Prices left out because they are out of date: {r.excludedPrices.map((e) => e.label).join('; ')}.</p>
       ) : null}
       {r.stateNote ? <p className="rx-pending">{r.stateNote.headline}</p> : null}
+      <CashDecision data={data} insuranceType={insuranceType} />
     </div>
   );
 }
@@ -120,6 +181,13 @@ export function bestPathText(data: RxOptions, sample: SamplePatient): string {
   const bridge = data.ranking?.bridges[0] ?? null;
   const who = sample.subject.caringFor ? `for ${sample.subject.caringFor.name}` : 'for you';
   if (!w) {
+    // No priced path, but a program that sets its own terms (a foundation
+    // or assistance program): point to it rather than to nothing.
+    const termsPath = data.ranking?.ranked.find((p) => !p.reference && !p.oneTime && p.monthlyCostUsd == null);
+    if (termsPath) {
+      const blockedLine = data.ranking?.blocked.length ? ` The manufacturer copay card can't be used ${who} because of Medicare rules.` : '';
+      return `The program I'd check first ${who} is the ${termsPath.title}. It doesn't list one set price; the program sets its own terms.${blockedLine} Every source shows the date I checked it. Here's what you need for the call.`;
+    }
     return data.ranking?.blocked.length
       ? `The manufacturer copay card can't be used ${who} because of Medicare rules. I'm still checking the other programs for this medicine.`
       : "I don't have a verified price to point you to yet. When I do, it shows up here with its source.";

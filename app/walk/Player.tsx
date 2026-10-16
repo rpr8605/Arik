@@ -245,7 +245,7 @@ export function Player({ flow, patient, drug }: { flow: string; patient: string 
         return <Deadline label={s.label} date={s.date} />;
       case 'rx_results':
         return rx ? (
-          <RxResults data={rx} />
+          <RxResults data={rx} insuranceType={sample.subject.insuranceType} />
         ) : rxError ? (
           <Arik>
             Something hiccuped loading prices.{' '}

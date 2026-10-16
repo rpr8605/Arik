@@ -17,6 +17,17 @@ export interface RxOptions {
   blockedReason: string | null;
   // A phone only ever comes from a cited program page (exploits.support_phone).
   phone: ProgramPhone | null;
+  // Program facts the cash-vs-insurance line and counter card need (db/037).
+  programs?: {
+    title: string;
+    card_bin: string | null;
+    card_pcn: string | null;
+    card_group: string | null;
+    card_member_id_rule: string | null;
+    card_details_source_url: string | null;
+    federal_program_allowed: string | null;
+    counts_toward_deductible: string | null;
+  }[];
 }
 
 export async function loadRxOptions(drugName: string, sample: SamplePatient): Promise<RxOptions> {
@@ -75,5 +86,15 @@ export async function loadRxOptions(drugName: string, sample: SamplePatient): Pr
     },
     blockedReason,
     phone,
+    programs: (viable as any[]).map((e) => ({
+      title: e.title,
+      card_bin: e.card_bin ?? null,
+      card_pcn: e.card_pcn ?? null,
+      card_group: e.card_group ?? null,
+      card_member_id_rule: e.card_member_id_rule ?? null,
+      card_details_source_url: e.card_details_source_url ?? null,
+      federal_program_allowed: e.federal_program_allowed ?? null,
+      counts_toward_deductible: e.counts_toward_deductible ?? null,
+    })),
   };
 }

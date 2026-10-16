@@ -39,6 +39,8 @@ import { enabledQuoteAdapters } from '@/lib/pricing/quoteSources';
 import { partitionPricesForConsent } from '@/lib/pricing/enforcement';
 import { benchmarkOnlyAnswer, type BenchmarkRow } from '@/lib/benchmarkAnswer';
 import { genericComponents } from '@/lib/drugdata/parse';
+import { cashDecisionNote } from '@/lib/counterCard';
+import { coverageFrom } from '@/lib/rules/cashVsInsurance';
 
 // Per-instance quote cache (10 minutes).
 const QUOTE_CACHE = createQuoteCache();
@@ -333,6 +335,7 @@ export async function generateGroundedResponse(opts: {
     profile: modelProfile(opts.context.profile),
     knownPrograms: await allProgramTitles(),
     allowedTitles: (opts.context.exploits ?? []).map((e: any) => e.title),
+    coverage: coverageFrom(opts.context.profile?.insurance_type ?? null),
   });
   const guarded = await withGroundingGuard({
     generate: (retryNote) =>
@@ -595,7 +598,17 @@ export async function POST(req: Request) {
     history: history ?? [],
     lang,
     format: useCardFormat ? 'card' : 'standard',
-    blockedNote: blockedNote + unavailableNote(quotes.unavailable, lang),
+    blockedNote:
+      blockedNote +
+      unavailableNote(quotes.unavailable, lang) +
+      // Cash vs insurance for the best path, and the "At the counter" card
+      // when it is a cash or discount-card price: built in code.
+      cashDecisionNote({
+        best: ranking?.winner ?? null,
+        program: (context.exploits ?? []).find((e: any) => e.title === ranking?.winner?.title) ?? null,
+        insuranceType: subject.insuranceType,
+        lang,
+      }),
     ranking,
     styleBlock: styleBlock(style),
   });

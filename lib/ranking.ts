@@ -19,7 +19,7 @@
 // - "as low as $X" (patient_price_type) is never collapsed into "$X".
 
 import { supabaseAdmin } from './supabaseAdmin';
-import { partitionCopayCardsForInsurance, COPAY_CARD_BLOCK_REASON } from './medicareEligibility';
+import { partitionCopayCardsForInsurance, isGovernmentInsurance, COPAY_CARD_BLOCK_REASON } from './medicareEligibility';
 import { partitionPricesForConsent, type PriceSourceConsent } from './pricing/enforcement';
 
 export interface RankingPatient {
@@ -45,6 +45,9 @@ export interface RankedPathway {
   // Pharmacy-level prices only (M05-AC4). distanceMiles is null when the
   // patient's location or the pharmacy's coordinates are unknown.
   pharmacy?: { name: string | null; distanceMiles: number | null };
+  // A published reference price (list price): shown for context, never the
+  // best path.
+  reference?: boolean;
 }
 
 export interface RankingResult {
@@ -138,6 +141,17 @@ function eligibilityNotes(e: any, p: RankingPatient): { viable: boolean; notes: 
       notes.push(`Income-tested (limit $${crit.income_max_usd.toLocaleString()}/yr): your income is needed to say more. This is a "likely" path, not a confirmed one.`);
     } else {
       notes.push(`Income-tested (limit $${crit.income_max_usd.toLocaleString()}/yr): confirm against your exact dollar income. The program states the limit in dollars, not %FPL.`);
+    }
+  }
+  // A drug maker's direct/cash program for a Medicare or Medicaid patient
+  // (rx_routing_build.md ground rule, lib/rules/cashVsInsurance.ts): only
+  // when the program is confirmed to allow it (db/037). Unknown is held as
+  // pending, never offered.
+  if (government && e.exploit_type === 'direct_to_patient_program') {
+    const f = e.federal_program_allowed ?? 'unknown';
+    if (f === 'no') return { viable: false, notes: ["Program terms exclude Medicare and Medicaid patients."] };
+    if (f !== 'yes') {
+      return { viable: false, pending: true, notes: ["Not yet confirmed that this drug maker's program allows Medicare or Medicaid patients, so it isn't offered until it is."] };
     }
   }
   if (crit.medicare_part_d_may_qualify === true && t === 'medicare_part_d') {
@@ -324,9 +338,12 @@ export function rankPathways(input: {
   //   exploit row when both exist — keep the exploit (richer content).
   const hasDtpExploit = ranked.some((p) => p.kind === 'direct_to_patient_program');
   const patientHasPartD = patient.insuranceType === 'medicare_part_d';
+  const governmentPatient = isGovernmentInsurance(patient.insuranceType);
   const applicablePrices = (pricePoints ?? []).filter((pp: any) => {
     if ((pp.price_type === 'ira_negotiated' || pp.price_type === 'medicare_part_d') && !patientHasPartD) return false;
-    if (pp.price_type === 'direct_to_patient' && hasDtpExploit) return false;
+    // A direct-to-patient price row carries no "federal programs allowed"
+    // fact, so it is never a Medicare/Medicaid patient's path.
+    if (pp.price_type === 'direct_to_patient' && (hasDtpExploit || governmentPatient)) return false;
     return true;
   });
   // db/022 enforcement: staleness + source consent BEFORE pathway
@@ -354,7 +371,9 @@ export function rankPathways(input: {
   bridges.sort((a, b) => (a.monthlyCostUsd ?? Infinity) - (b.monthlyCostUsd ?? Infinity));
   // WINNER: lowest projected 3-12 month cost among ongoing pathways.
   // Bridges never enter `ranked`, so a one-time trial can't win.
-  const winner = ranked.find((p) => p.projectedAnnualCostUsd != null) ?? null;
+  // A list price is a published reference, never a way to pay: shown,
+  // never the winner.
+  const winner = ranked.find((p) => p.projectedAnnualCostUsd != null && !p.reference) ?? null;
   return { ranked, bridges, pendingVerification, notApplicable, blocked, stateNote, winner, excludedPrices };
 }
 
@@ -426,6 +445,7 @@ function nationalPathways(pricePoints: any[]): RankedPathway[] {
     out.push({
       kind: 'price_point',
       title: `${type.replaceAll('_', ' ')} price`,
+      ...(type === 'list' ? { reference: true } : {}),
       monthlyCostUsd: Math.round(best.monthly * 100) / 100,
       priceSemantics: 'flat',
       projectedAnnualCostUsd: Math.round(best.monthly * 12 * 100) / 100,

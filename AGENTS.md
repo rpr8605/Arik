@@ -74,7 +74,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/031_pricing_s2_closeout.sql` → `db/032_drug_data.sql`
 → `db/033_imbruvica_negotiated_price.sql` → `db/034_routing_partners.sql`
 → `db/035_denial_data.sql` → `db/036_policy_documents.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–036
+→ `db/037_program_card_details.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–037
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -353,6 +354,18 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     enable|purge`, `disclosure.ts` + `app/how-we-route`. db/034:
     `compensation_to_arik` check = 'none', enabling needs a data use
     agreement date. Tests: `test_routing.ts`, `test_routing_db.mjs`.
+  - `rules/cashVsInsurance.ts` + `counterCard.ts` — cash vs insurance
+    (2026-10-16, docs/kimi/PLAN_CASH_VS_INSURANCE.md; regulation quotes
+    in docs/research/cash_vs_insurance_verification.md): codes + one EN/ES
+    string table, decided in code. Medicaid never steered to cash (line
+    is the softer "bill Medicaid first", marked pending owner approval);
+    Medicare always gets the Part D limit caveat; commercial asks for
+    plan cost and deductible status. Ranking: a drug maker's program is
+    pending for Medicare/Medicaid until `exploits.federal_program_allowed`
+    = 'yes' (db/037); a list price is `reference` and never the winner.
+    "At the counter" card only for cash/discount-card paths, card numbers
+    only with `card_details_source_url`. Guard rule 6: no cash advice to
+    a Medicaid patient. Test: `test_cash_vs_insurance.ts`.
   - `data/` — free data loaders Part A (2026-10-16): `denial.ts` (pure:
     TiC PUF values `*`/`**`/`***`/`N/A` -> null + flag, per-issuer
     aggregation, prior auth template validation, summaries that never
