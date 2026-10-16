@@ -14,8 +14,10 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   const sb = supabaseAdmin();
   const deleted: Record<string, number> = {};
 
-  async function del(table: string, filter: (q: any) => any) {
-    const { data, error } = await filter(sb.from(table).delete()).select('id');
+  // `key` is the column returned to count rows: 'id' everywhere except
+  // tables keyed by user_id (user_style_prefs has no id column).
+  async function del(table: string, filter: (q: any) => any, key = 'id') {
+    const { data, error } = await filter(sb.from(table).delete()).select(key);
     if (error) throw new Error(`${table}: ${error.message}`);
     deleted[table] = (deleted[table] ?? 0) + (data?.length ?? 0);
   }
@@ -25,7 +27,7 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   // ledger is the user's own data too - "erase everything" includes it.
   await del('pending_fact_corrections', (q) => q.eq('user_id', userId));
   await del('pending_case_facts', (q) => q.eq('user_id', userId));
-  await del('user_style_prefs', (q) => q.eq('user_id', userId));
+  await del('user_style_prefs', (q) => q.eq('user_id', userId), 'user_id');
   await del('consent_ledger', (q) => q.eq('user_id', userId));
   await del('case_summaries', (q) => q.eq('user_id', userId));
 
