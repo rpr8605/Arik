@@ -74,8 +74,9 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/031_pricing_s2_closeout.sql` → `db/032_drug_data.sql`
 → `db/033_imbruvica_negotiated_price.sql` → `db/034_routing_partners.sql`
 → `db/035_denial_data.sql` → `db/036_policy_documents.sql`
-→ `db/037_program_card_details.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–037
+→ `db/037_program_card_details.sql` → `db/038_bill_review.sql`
+→ `db/039_bill_reference_data.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–039
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -168,6 +169,31 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   RETRIEVED_CONTEXT is built by `lib/chatRetrieval.ts` with the
   consent/staleness partition applied inside; the API response carries
   `excluded_prices` (withheld stale prices are said out loud).
+- The real bill path (Phases 2 to 4, 2026-10-16; plan:
+  docs/kimi/PLAN_PHASES_2_4.md). Interfaces in `lib/production/types.ts`,
+  demo and real implementations side by side, one contract suite
+  (`test_production_contracts.ts`). Reader: on-server by default
+  (`lib/production/real/readers.ts` + pure `lib/production/layout.ts`;
+  `DOCUMENT_READER=model` is an opt-in that needs a BAA; the vision
+  reader refuses any non-synthetic document). Benchmark:
+  docs/research/reader_benchmark.md. Checks: pure
+  `lib/rules/bills/checks.ts` (duplicates, room days, ask-about, MUE unit
+  limits, NCCI pairs, doctor price benchmark) on reference rows from
+  db/039 loaded by `npm run ingest -- bill_refs` (numbers only, no CPT
+  descriptions). NCCI pair files and the OPPS/CLFS fee files sit behind
+  the AMA license page on cms.gov and are NOT downloaded: pairs load only
+  via `--ptp-dir` after the owner accepts that license; until then the
+  pair check finds nothing. Letters: `lib/letters/` (every fact written by
+  code; `LETTER_MODEL_SENTENCE=true` adds one guarded tone sentence, the
+  model is told no patient data); freeze = sha256 + pdf-lib PDF, and a DB
+  trigger refuses edits to a frozen letter's content. Routes:
+  `cases/[id]/documents/[docId]/confirm`, `cases/[id]/letters`,
+  `cases/[id]/letters/[letterId]` (403 in DEMO_MODE). Screen:
+  `app/cases/[id]/BillReview.tsx`. Tests: test_layout, test_bill_checks,
+  test_letters, test_confirm_bill; e2e `scripts/synth_docs/e2e.ts`;
+  live `smoke_bill_review.mjs`. Pending: No Surprises and charity-care
+  checks (rule text not yet verified and quoted), appeal and records
+  letters (they come with the denial flow).
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure
@@ -529,7 +555,11 @@ create-extension lines locally), `db_reset.mjs` + `db_check.mjs` (the
   pdf-to-img 7.0.0); pdfjs throws "API version does not match Worker
   version" otherwise. Keep them deduped (`npm ls pdfjs-dist`).
 - OCR: `tesseract.js` 7.0.0 with `@tesseract.js-data/eng` 1.0.0 (the
-  English data ships in node_modules; no download at run time).
+  English data ships in node_modules; no download at run time). It MUST
+  stay in `serverExternalPackages` and keep its explicit `workerPath`
+  (lib/production/real/readers.ts): bundled, the worker path becomes
+  `E:\ROOT\node_modules\...`, the worker never starts and an upload
+  hung 3.7 minutes. Worker start and each page are time-capped.
 - pdfjs `standardFontDataUrl` needs a real fs path with a trailing
   FORWARD slash (Turbopack's require.resolve returns a virtual
   "[externals]" path; use process.cwd() + node_modules, see
