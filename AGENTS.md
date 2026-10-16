@@ -72,8 +72,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/027_user_style_prefs.sql` → `db/028_demo_samples.sql`
 → `db/029_program_phones.sql` → `db/030_bmspaf_medicare_terms.sql`
 → `db/031_pricing_s2_closeout.sql` → `db/032_drug_data.sql`
-→ `db/033_imbruvica_negotiated_price.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–033
+→ `db/033_imbruvica_negotiated_price.sql` → `db/034_routing_partners.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–034
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -341,6 +341,17 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     with no patient-price path gets the code-built answer in
     `benchmarkAnswer.ts` ("what pharmacies pay", never "your price").
     Tests: `test_drug_data.ts`, `test_benchmark_answer.ts`.
+  - `routing/` — prescription routing Part B (M24, 2026-10-16), MOCK
+    ONLY, no partner names: `RxRoutingProvider` (provider.ts, boundary
+    validation, opaque `newRoutingReference` so no patient data goes to a
+    partner), `httpProvider.ts` (M07 client + shared `createAuth`; the
+    private repo supplies field `map` functions), `mockRoutingPartner.ts`,
+    `contract.ts` (`runRoutingContract`: the suite the real adapter must
+    pass), `rank.ts` (`rankDestinations` drops partner identity before
+    ordering; neutrality test), `admin.ts` + `npm run routing:disable|
+    enable|purge`, `disclosure.ts` + `app/how-we-route`. db/034:
+    `compensation_to_arik` check = 'none', enabling needs a data use
+    agreement date. Tests: `test_routing.ts`, `test_routing_db.mjs`.
   - `pricing/adapter.ts` — source-agnostic `PriceSourceAdapter` contract
     (fetch/normalize → `NormalizedPrice`; rejects are logged, never
     coerced), `pricing/adapters/` (registry + `nadac.ts`; field mapping

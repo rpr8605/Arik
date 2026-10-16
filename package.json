@@ -13,7 +13,10 @@
     "ingest": "tsx scripts/ingest_prices.ts --source",
     "source:disable": "tsx scripts/source_admin.ts disable",
     "source:enable": "tsx scripts/source_admin.ts enable",
-    "source:purge": "tsx scripts/source_admin.ts purge"
+    "source:purge": "tsx scripts/source_admin.ts purge",
+    "routing:disable": "tsx scripts/routing_admin.ts disable",
+    "routing:enable": "tsx scripts/routing_admin.ts enable",
+    "routing:purge": "tsx scripts/routing_admin.ts purge"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",

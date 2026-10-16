@@ -305,6 +305,22 @@ Phased: v1 (S3) prepares and tracks, nothing leaves the system; v2 (S5) sends fo
 
 **Status (2026-10-16):** AC1 to AC7 DONE, mock only: lib/pricing/http.ts (test_http_client.ts), configAdapter.ts + mockPartner.ts + scripts/mock_partner_api.ts, quotes.ts wired into chat with a note when a source doesn't answer, `npm run source:disable|enable|purge` with source_admin_events, instrumentation.ts + /api/health env check, no-leak test (test_partner_readiness.ts), docs/partner_onboarding_checklist.md. AC8 waits on the partner's written OK and docs (private repo).
 
+### M24. Prescription routing
+
+**Purpose:** when a manufacturer direct or other cash pharmacy is the cheapest legitimate path, help the patient get the prescription to that pharmacy, through a neutral adapter for any routing partner. Build prompt: docs/kimi/rx_routing_build.md.
+**Hard rules:** no money for routing, ever (no fee, revenue share, referral payment, data fee or favor; enforced by a DB check and tests); partner names, terms, prices and API details never in this repo ("routing partner"); the real adapter lives in the private adapters repo and passes the same contract suite; decisions (cash vs insurance, eligibility, Medicare/Medicaid blocks) come from the rules engine, never the model; Arik never makes a clinical decision and never sends a prescription itself; only an opaque reference goes to a partner, never patient identifiers.
+
+| ID | Criterion | Stage |
+| --- | --- | --- |
+| M24-AC1 | `dtc_programs` table, CSV import with template, every row sourced | S3 |
+| M24-AC2 | Cash vs insurance rule (`lib/rules/cashVsInsurance.ts`): government-insured never steered to a DTP program unless allowed; unknown plan cost asks the patient; deductible caveat | S3 |
+| M24-AC3 | Routing and transfer request documents, prepared only, patient approval, receipt; no transfer for controlled substances | S3 |
+| M24-AC4 | `RxRoutingProvider` interface, boundary validation, mock provider, reusable contract suite, kill switch and purge | S3 (mock), S5 (live) |
+| M24-AC5 | `routing_partners` with `compensation_to_arik = 'none'` enforced by a DB check; neutrality test (affiliation never changes ranking) | S3 |
+| M24-AC6 | Public `/how-we-route` page generated from `routing_partners` | S3 |
+
+**Status (2026-10-16):** AC4 to AC6 DONE against the mock: lib/routing/ (provider, httpProvider, mockRoutingPartner, contract, rank, admin, disclosure), db/034, `npm run routing:disable|enable|purge`, app/how-we-route; tests test_routing.ts (contract, minimization, neutrality, no-money) and test_routing_db.mjs (DB checks, kill switch). AC2 is queued (owner's list, after free_data_loaders). AC1 and AC3 MISSING. Live partner connection waits for S4 security, a signed data use agreement and the partner's written OK.
+
 ### M08. Price Integrity Loop
 
 **Purpose:** know whether quoted prices actually held at the counter; score sources.

@@ -167,6 +167,47 @@ export class SourceParseError extends Error {
   }
 }
 
+// Auth headers for a source (M07-AC2), shared by price and routing
+// adapters. Values come from env vars NAMED in the config; an OAuth token
+// is fetched once and reused until shortly before it expires.
+export function createAuth(
+  sourceKey: string,
+  auth: SourceAuth,
+  env: Record<string, string | undefined>,
+  client: { request: (url: string, init?: RequestInit) => Promise<Response> },
+  now: () => number = Date.now,
+) {
+  let oauthToken: { value: string; until: number } | null = null;
+  async function headers(): Promise<Record<string, string>> {
+    if (auth.type === 'api_key') return { [auth.header]: env[auth.env] ?? '' };
+    if (auth.type === 'bearer') return { Authorization: `Bearer ${env[auth.env] ?? ''}` };
+    if (auth.type === 'oauth_client_credentials') {
+      if (oauthToken && oauthToken.until > now()) return { Authorization: `Bearer ${oauthToken.value}` };
+      const body = new URLSearchParams({ grant_type: 'client_credentials' });
+      if (auth.scope) body.set('scope', auth.scope);
+      const basic = Buffer.from(`${env[auth.clientIdEnv] ?? ''}:${env[auth.clientSecretEnv] ?? ''}`).toString('base64');
+      const res = await client.request(auth.tokenUrl, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+      let j: unknown;
+      try {
+        j = await res.json();
+      } catch {
+        throw new SourceParseError(sourceKey, 'malformed JSON');
+      }
+      const token = getPath(j, 'access_token');
+      if (typeof token !== 'string' || !token) throw new SourceParseError(sourceKey, 'token response without access_token');
+      const ttl = Number(getPath(j, 'expires_in'));
+      oauthToken = { value: token, until: now() + (Number.isFinite(ttl) && ttl > 30 ? (ttl - 30) * 1000 : 300000) };
+      return { Authorization: `Bearer ${token}` };
+    }
+    return {};
+  }
+  return { headers };
+}
+
 export interface ConfigAdapterDeps {
   env: Record<string, string | undefined>;
   http?: Omit<HttpClientOptions, 'sourceKey'>;
@@ -174,32 +215,8 @@ export interface ConfigAdapterDeps {
 
 export function createConfigAdapter(c: SourceConfig, sourceId: string, deps: ConfigAdapterDeps) {
   const client = createHttpClient({ sourceKey: c.key, ...(deps.http ?? {}) });
-  let oauthToken: { value: string; until: number } | null = null;
-  const now = deps.http?.now ?? Date.now;
-
-  async function authHeaders(): Promise<Record<string, string>> {
-    const a = c.auth;
-    if (a.type === 'api_key') return { [a.header]: deps.env[a.env] ?? '' };
-    if (a.type === 'bearer') return { Authorization: `Bearer ${deps.env[a.env] ?? ''}` };
-    if (a.type === 'oauth_client_credentials') {
-      if (oauthToken && oauthToken.until > now()) return { Authorization: `Bearer ${oauthToken.value}` };
-      const body = new URLSearchParams({ grant_type: 'client_credentials' });
-      if (a.scope) body.set('scope', a.scope);
-      const basic = Buffer.from(`${deps.env[a.clientIdEnv] ?? ''}:${deps.env[a.clientSecretEnv] ?? ''}`).toString('base64');
-      const res = await client.request(a.tokenUrl, {
-        method: 'POST',
-        headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-      });
-      const j = await readJson(res);
-      const token = getPath(j, 'access_token');
-      if (typeof token !== 'string' || !token) throw new SourceParseError(c.key, 'token response without access_token');
-      const ttl = Number(getPath(j, 'expires_in'));
-      oauthToken = { value: token, until: now() + (Number.isFinite(ttl) && ttl > 30 ? (ttl - 30) * 1000 : 300000) };
-      return { Authorization: `Bearer ${token}` };
-    }
-    return {};
-  }
+  const auth = createAuth(c.key, c.auth, deps.env, client, deps.http?.now ?? Date.now);
+  const authHeaders = auth.headers;
 
   async function readJson(res: Response): Promise<unknown> {
     try {
