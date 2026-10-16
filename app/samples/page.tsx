@@ -3,7 +3,10 @@ import { isDemoMode } from '@/lib/demo/samples';
 import { SamplePicker } from './SamplePicker';
 
 // "Try a sample patient" (DEMO_DAY.md stage 1). Exists only with
-// DEMO_MODE=true.
+// DEMO_MODE=true. Rendered per request so the gate follows the deploy's
+// setting, never a 404 cached at build time.
+export const dynamic = 'force-dynamic';
+
 export default function SamplesPage() {
   if (!isDemoMode()) notFound();
   return (

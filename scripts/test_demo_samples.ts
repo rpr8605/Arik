@@ -67,8 +67,13 @@ check('no sample -> unchanged visitor subject', resolveChatSubject({ userProfile
 
 // --- Switch, session id, idle rule ---
 check('DEMO_MODE unset -> off', isDemoMode({}) === false);
-check('DEMO_MODE=1 -> off (only "true" turns it on)', isDemoMode({ DEMO_MODE: '1' }) === false);
 check('DEMO_MODE=true -> on', isDemoMode({ DEMO_MODE: 'true' }) === true);
+check('DEMO_MODE=1 -> on', isDemoMode({ DEMO_MODE: '1' }) === true);
+check('DEMO_MODE " TRUE " (spaces, capitals) -> on', isDemoMode({ DEMO_MODE: ' TRUE ' }) === true);
+check('DEMO_MODE "true" plus a pasted newline -> on', isDemoMode({ DEMO_MODE: 'true' + String.fromCharCode(10) }) === true);
+for (const v of ['', 'false', '0', 'yes', 'on', '"true"', 'truee']) {
+  check(`DEMO_MODE=${JSON.stringify(v)} -> off`, isDemoMode({ DEMO_MODE: v }) === false);
+}
 check('sample session id: a UUID is accepted', isValidSampleSessionId('3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'));
 check('sample session id: junk, SQL and empty are rejected', ['', 'abc', "x' or 1=1 --", null, 42].every((v) => !isValidSampleSessionId(v)));
 const t0 = new Date('2026-10-15T12:00:00Z');

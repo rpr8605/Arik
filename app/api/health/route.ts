@@ -6,11 +6,14 @@
 //
 // Unauthenticated by design, so it reveals nothing sensitive: no values,
 // no row counts, no error text from the database. Missing env vars are
-// reported by NAME only so an operator can fix a bad deploy. /api/* is
+// reported by NAME only so an operator can fix a bad deploy. demo_mode is
+// the one setting shown as a value: a boolean, so the demo gate can be
+// checked from outside. No other setting is ever echoed here. /api/* is
 // already excluded from anonymous-session creation in proxy.ts.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { missingEnv } from '@/lib/env';
+import { isDemoMode } from '@/lib/demo/samples';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +40,7 @@ export async function GET(req: NextRequest) {
     version: process.env.APP_VERSION ?? 'unknown',
     time: new Date().toISOString(),
     missingEnv: missing,
+    demo_mode: isDemoMode(),
   };
 
   if (req.nextUrl.searchParams.get('db') === '1') {

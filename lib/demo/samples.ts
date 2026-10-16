@@ -283,10 +283,12 @@ export const JOB_STATUS_LABEL: Record<JobStatus, string> = {
   waiting: 'Waiting on reply',
 };
 
-// DEMO_MODE is set on the Vercel demo only. Off (unset or anything but
-// "true"), the picker, the walkthroughs and every demo API do not exist.
+// DEMO_MODE is set on the Vercel demo only. On for "true" or "1" (trimmed,
+// any case); off for anything else, and then the picker, the walkthroughs
+// and every demo API do not exist.
 export function isDemoMode(env: Record<string, string | undefined> = process.env): boolean {
-  return env.DEMO_MODE === 'true';
+  const v = (env.DEMO_MODE ?? '').trim().toLowerCase();
+  return v === 'true' || v === '1';
 }
 
 // The per-tab sample session id is generated in the browser
