@@ -11,11 +11,18 @@
 //   HEIC (iPhone default)  -> server-side JPEG conversion first (more
 //   ('image_upload')         reliable across devices than client-side)
 //
+// Reader (2026-10-16, owner decision): the DEFAULT reader is on-server
+// (pdfjs text layer, else tesseract OCR; lib/production/real/readers.ts):
+// nothing leaves this server, and it returns line items with page
+// positions for the bill checks. The model reader below is used only when
+// DOCUMENT_READER=model is set, which needs a BAA-covered model first.
+//
 // Screening is file-type + size ONLY. Malware scanning is a known gap,
 // explicitly deferred - do not close it accidentally; track separately.
 
 import { join } from 'node:path';
 import { callModel, type ModelImage } from './callModel';
+import type { ExtractedDocument } from './production/types';
 
 // pdfjs needs its bundled standard fonts even for text-only extraction
 // (it warns/falls back otherwise). Resolved from process.cwd() (the
@@ -87,6 +94,9 @@ export interface DocumentExtraction {
   total_amount_usd: number | null;
   denial_reason: string | null;
   summary: string | null;
+  // On-server reader only: what it read, line by line, with positions.
+  reader?: string;
+  layout?: ExtractedDocument;
 }
 
 const DOC_TYPES = ['itemized_bill', 'eob', 'denial_letter', 'insurance_card', 'spd', 'other'] as const;
@@ -173,12 +183,40 @@ function sniffImageMime(buf: Buffer): 'image/png' | 'image/jpeg' {
   throw new Error('file claims to be an image but has no PNG/JPEG signature');
 }
 
+// The on-server reading in the shape the route and the upload screen
+// already use. Pure. Header fields only; no summary, no denial reason (the
+// on-server parser doesn't write prose).
+export function layoutToExtraction(doc: ExtractedDocument): DocumentExtraction {
+  const h = doc.header;
+  const bill = doc.docType === 'itemized_bill' || doc.docType === 'summary_bill';
+  return {
+    doc_type: bill ? 'itemized_bill' : doc.docType === 'eob' || doc.docType === 'denial_letter' || doc.docType === 'insurance_card' ? doc.docType : 'other',
+    institution_name: bill ? h.provider.value : null,
+    payer_name: doc.docType === 'eob' || doc.docType === 'denial_letter' ? h.provider.value : null,
+    total_amount_usd: bill ? h.amountDueUsd.value : null,
+    denial_reason: null,
+    summary: null,
+    reader: doc.reader,
+    layout: doc,
+  };
+}
+
+export const documentReader = () => (process.env.DOCUMENT_READER?.trim().toLowerCase() === 'model' ? 'model' : 'on-server');
+
 // One call per upload: decides native-vs-scanned for PDFs, converts HEIC,
 // and returns everything the route needs to persist the row.
 export async function processUpload(
   kind: IntakeKind,
   buf: Buffer,
 ): Promise<{ sourceFormat: SourceFormat; extraction: DocumentExtraction }> {
+  if (documentReader() === 'on-server') {
+    const { onServerExtractor } = await import('./production/real/readers');
+    const bytes = kind === 'heic' ? Buffer.from((await convertHeic(buf)).base64, 'base64') : buf;
+    const mime = kind === 'pdf' ? 'application/pdf' : kind === 'heic' ? 'image/jpeg' : sniffImageMime(buf);
+    const doc = await onServerExtractor.extract({ bytes: new Uint8Array(bytes), mime, filename: 'upload', origin: 'upload' });
+    const sourceFormat: SourceFormat = kind !== 'pdf' ? 'image_upload' : doc.reader.endsWith('text-layer') ? 'pdf_native' : 'pdf_scanned';
+    return { sourceFormat, extraction: layoutToExtraction(doc) };
+  }
   if (kind === 'pdf') {
     const text = await extractPdfText(buf);
     if (text.length >= NATIVE_TEXT_MIN_CHARS) {

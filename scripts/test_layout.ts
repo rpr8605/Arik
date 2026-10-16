@@ -97,5 +97,9 @@ check('denial: type and the letter date (a "date of this letter" row is not a la
 check('denial: no line items', denial.lines.length === 0);
 check('unknown text stays unknown', detectDocType('hello world') === 'unknown');
 
+const titled = parseDocument(page(['ITEMIZED STATEMENT', "Saint Brigid Sample Medical Center", 'Patient: Rosa Fairbairn', 'Account: 123456', 'PATIENT RESPONSIBILITY: $1,250.00']), 'test');
+check('provider: a title row is skipped for the organization under it', titled.header.provider.value === 'Saint Brigid Sample Medical Center', String(titled.header.provider.value));
+check('amount due: "patient responsibility" is what the patient owes', titled.header.amountDueUsd.value === 1250);
+
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASS');
 process.exit(failures ? 1 : 0);

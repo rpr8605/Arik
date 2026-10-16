@@ -33,6 +33,9 @@ import { POST as purgePost } from '../app/api/jobs/purge-expired-uploads/route';
 import { GET as samplesGet, POST as samplesPost } from '../app/api/demo/samples/route';
 import { POST as samplesResetPost } from '../app/api/demo/samples/reset/route';
 import { GET as rxGet } from '../app/api/demo/rx/route';
+import { GET as confirmGet, POST as confirmPost } from '../app/api/cases/[id]/documents/[docId]/confirm/route';
+import { POST as lettersPost } from '../app/api/cases/[id]/letters/route';
+import { GET as letterGet, PATCH as letterPatch } from '../app/api/cases/[id]/letters/[letterId]/route';
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = '') {
@@ -525,8 +528,66 @@ async function demoSamples() {
   }
 }
 
+// The real bill path (Phases 2 to 4): confirm, letters, one letter.
+async function billPath() {
+  const asA = { getUserId: (async () => A) as any, isDemoMode: () => false };
+  const docParams = (id: string, docId: string) => ({ params: Promise.resolve({ id, docId }) });
+  const letterParams = (id: string, letterId: string) => ({ params: Promise.resolve({ id, letterId }) });
+  const routes: [string, () => Promise<Response>][] = [
+    ['confirm GET', () => confirmGet(fakeReq(), docParams('c1', 'd1'))],
+    ['confirm POST', () => confirmPost(fakeReq({ body: {} }), docParams('c1', 'd1'))],
+    ['letters POST', () => lettersPost(fakeReq({ body: { documentId: 'd1', type: 'billing_dispute' } }), paramsFor('c1'))],
+    ['letter GET', () => letterGet(fakeReq(), letterParams('c1', 'l1'))],
+    ['letter PATCH', () => letterPatch(fakeReq({ body: { action: 'freeze' } }), letterParams('c1', 'l1'))],
+  ];
+  for (const [name, call] of routes) await expect401(`${name}: unauthenticated -> 401`, call);
+  // Everything below must stop before any data function runs.
+  const touched: string[] = [];
+  const spy = (n: string, v: unknown = null) => (async () => { touched.push(n); return v; }) as any;
+  const data = { getCaseDocument: spy('getCaseDocument'), confirmAndReview: spy('confirmAndReview'), createLetter: spy('createLetter'), getLetter: spy('getLetter'), editLetter: spy('editLetter'), freezeLetter: spy('freezeLetter') };
+  for (const [name, call] of routes) {
+    touched.length = 0;
+    stub({ ...asA, ...data, canAccessCase: (async () => false) as any });
+    const res = await call();
+    restore();
+    check(`${name}: B's case -> 404, no data touched`, res.status === 404 && touched.length === 0, `status ${res.status} touched ${touched.join(',')}`);
+  }
+  for (const [name, call] of routes) {
+    touched.length = 0;
+    stub({ ...asA, ...data, isDemoMode: () => true, canAccessCase: (async () => true) as any });
+    const res = await call();
+    restore();
+    check(`${name}: DEMO_MODE on -> 403 (the demo is scripted)`, res.status === 403 && touched.length === 0, `status ${res.status}`);
+  }
+  // Own case, but the document or letter isn't in it -> the same 404.
+  for (const [name, call] of routes) {
+    touched.length = 0;
+    stub({ ...asA, ...data, canAccessCase: (async () => true) as any });
+    const res = await call();
+    restore();
+    const expected = name === 'letters POST' || name === 'confirm POST' || name === 'confirm GET' ? 'getCaseDocument' : name === 'letter PATCH' ? 'freezeLetter' : 'getLetter';
+    check(`${name}: own case, missing row -> 404 after the case check`, res.status === 404 && touched[0] === expected && !touched.includes('confirmAndReview') && !touched.includes('createLetter'), `status ${res.status} touched ${touched.join(',')}`);
+  }
+  {
+    let reviewed: unknown = null;
+    stub({ ...asA, canAccessCase: (async () => true) as any, getCaseDocument: (async () => ({ id: 'd1' })) as any, confirmAndReview: (async (uid: string, cid: string, did: string) => { reviewed = { uid, cid, did }; return { findings: [], totalUsd: 0 }; }) as any });
+    const bad = await confirmPost(fakeReq({ body: { header: {}, lines: [{ chargeUsd: -5 }] } }), docParams('c1', 'd1'));
+    const good = await confirmPost(fakeReq({ body: { header: { accountNumber: 'X-1', serviceFrom: '2026-01-05' }, lines: [{ code: '85025', date: '2026-01-05', units: 1, chargeUsd: 186 }] } }), docParams('c1', 'd1'));
+    restore();
+    check('confirm POST: a malformed confirmation is refused (400) before review', bad.status === 400);
+    check('confirm POST: a valid confirmation is reviewed as the session user, on this case and document', good.status === 200 && JSON.stringify(reviewed) === JSON.stringify({ uid: A, cid: 'c1', did: 'd1' }), JSON.stringify(reviewed));
+  }
+  {
+    stub({ ...asA, canAccessCase: (async () => true) as any });
+    const res = await lettersPost(fakeReq({ body: { documentId: 'd1', type: 'insurer_appeal' } }), paramsFor('c1'));
+    restore();
+    check('letters POST: only bill letter types are written from a bill (400)', res.status === 400);
+  }
+}
+
 main()
   .then(() => demoSamples())
+  .then(() => billPath())
   .then(() => {
     console.log(failures === 0 ? '\nAUTH GUARDS: ALL PASS' : `\nAUTH GUARDS: ${failures} FAILURE(S)`);
     process.exit(failures === 0 ? 0 : 1);

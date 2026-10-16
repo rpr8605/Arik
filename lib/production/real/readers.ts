@@ -17,6 +17,7 @@ import type { DocType, ExtractedDocument, Extractor, Field, SourceDocument } fro
 
 const STANDARD_FONTS = join(process.cwd(), 'node_modules', 'pdfjs-dist', 'standard_fonts').split('\\').join('/') + '/';
 const TEXT_LAYER_MIN_CHARS = 120;
+const OCR_MAX_PAGES = 10;
 
 export async function pdfTextWords(bytes: Uint8Array): Promise<Word[]> {
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -56,19 +57,50 @@ export async function pdfToPngs(bytes: Uint8Array): Promise<Buffer[]> {
   return out;
 }
 
+// OCR never hangs a request: starting the worker and reading each page are
+// capped, and a worker that times out is thrown away (the upload then
+// fails cleanly as a 'failed' row, per the intake rules).
+const OCR_START_MS = 30_000;
+const OCR_PAGE_MS = 60_000;
+export function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    p.finally(() => clearTimeout(timer)),
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms / 1000}s`)), ms);
+    }),
+  ]);
+}
+
 let workerPromise: Promise<any> | null = null;
 async function ocrWorker() {
   if (!workerPromise) {
-    workerPromise = (async () => {
-      const { createWorker, OEM } = await import('tesseract.js');
-      return createWorker('eng', OEM.LSTM_ONLY, {
-        langPath: join(process.cwd(), 'node_modules', '@tesseract.js-data', 'eng', '4.0.0_best_int'),
-        gzip: true,
-        cacheMethod: 'none',
-      });
-    })();
+    workerPromise = withTimeout(
+      (async () => {
+        const { createWorker, OEM } = await import('tesseract.js');
+        return createWorker('eng', OEM.LSTM_ONLY, {
+          // Explicit paths: bundlers rewrite the package's own lookup.
+          workerPath: join(process.cwd(), 'node_modules', 'tesseract.js', 'src', 'worker-script', 'node', 'index.js'),
+          langPath: join(process.cwd(), 'node_modules', '@tesseract.js-data', 'eng', '4.0.0_best_int'),
+          gzip: true,
+          cacheMethod: 'none',
+          errorHandler: () => {},
+        });
+      })(),
+      OCR_START_MS,
+      'starting OCR',
+    ).catch((e) => {
+      workerPromise = null;
+      throw e;
+    });
   }
   return workerPromise;
+}
+
+async function dropWorker() {
+  const w = workerPromise;
+  workerPromise = null;
+  if (w) await w.then((x) => x.terminate()).catch(() => {});
 }
 
 export async function terminateOcr() {
@@ -87,7 +119,13 @@ export async function ocrWords(image: Buffer, page = 1): Promise<Word[]> {
   const W = meta.width ?? 1;
   const H = meta.height ?? 1;
   const worker = await ocrWorker();
-  const { data } = await worker.recognize(image, {}, { blocks: true });
+  let data: any;
+  try {
+    ({ data } = (await withTimeout(worker.recognize(image, {}, { blocks: true }), OCR_PAGE_MS, 'reading the page')) as any);
+  } catch (e) {
+    await dropWorker();
+    throw e;
+  }
   const words: Word[] = [];
   const angles: number[] = [];
   for (const b of data.blocks ?? []) {
@@ -123,7 +161,8 @@ export const ocrExtractor: Extractor = {
   name: 'ocr-tesseract',
   allowsRealPatientData: true,
   async extract(doc: SourceDocument) {
-    const images = doc.mime === 'application/pdf' ? await pdfToPngs(doc.bytes) : [Buffer.from(doc.bytes)];
+    // Same page cap as the intake's rasterization guard.
+    const images = (doc.mime === 'application/pdf' ? await pdfToPngs(doc.bytes) : [Buffer.from(doc.bytes)]).slice(0, OCR_MAX_PAGES);
     const words: Word[] = [];
     for (let i = 0; i < images.length; i++) words.push(...(await ocrWords(images[i], i + 1)));
     return parseDocument(words, 'ocr-tesseract');

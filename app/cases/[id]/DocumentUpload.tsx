@@ -2,6 +2,8 @@
 
 import { useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import type { ExtractedDocument } from '@/lib/production/types';
+import { BillReview } from './BillReview';
 
 // Document types in plain words (never the internal type name).
 const DOC_WORDS: Record<string, string> = {
@@ -24,6 +26,8 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A bill read line by line on the server: the patient checks it next.
+  const [review, setReview] = useState<{ documentId: string; reading: ExtractedDocument } | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -31,6 +35,7 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
     setBusy(true);
     setError(null);
     setResult(null);
+    setReview(null);
     try {
       const {
         data: { session },
@@ -63,6 +68,8 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
         (json.corrections ?? []).length > 0 ? 'Arik has a question for you in the chat' : null,
       ].filter(Boolean);
       setResult(parts.join('. '));
+      const layout = json.extraction?.layout as ExtractedDocument | undefined;
+      if (layout && json.document.doc_type === 'itemized_bill' && layout.lines.length) setReview({ documentId: json.document.id, reading: layout });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -116,6 +123,7 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
         </p>
       )}
       {error && <p role="alert">{error}</p>}
+      {review && <BillReview caseId={caseId} documentId={review.documentId} reading={review.reading} />}
     </section>
   );
 }

@@ -46,6 +46,7 @@ import { consumeRateLimit } from './rateLimit';
 import { getCaseSample, listSampleCases, openSampleCase, resetSampleSession, touchSampleCase } from './demo/sampleCases';
 import { isDemoMode } from './demo/samples';
 import { loadRxOptions } from './demo/rxOptions';
+import { confirmAndReview, createLetter, editLetter, freezeLetter, getCaseDocument, getLetter } from './production/billReview';
 
 export const apiDeps = {
   getUserId,
@@ -92,6 +93,14 @@ export const apiDeps = {
   resetSampleSession,
   // Demo walkthrough Flow 1: real prices for a sample patient (read-only).
   loadRxOptions,
+  // The real bill path (Phases 2 to 4, lib/production/billReview.ts):
+  // case-scoped reads and writes, called after canAccessCase.
+  getCaseDocument,
+  confirmAndReview,
+  createLetter,
+  getLetter,
+  editLetter,
+  freezeLetter,
 };
 
 export function unauthorized() {

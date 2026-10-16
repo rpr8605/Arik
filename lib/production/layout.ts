@@ -124,7 +124,7 @@ const LABELS = {
   statementDate: /^(statement date|date)\s*:?$/i,
   service: /^(dates of service|service dates|admit\s*-?\s*discharge|visit|date of service)\s*:?$/i,
   total: /^(total charges|total)\s*:?$/i,
-  due: /^(amount due|please pay|balance due|amount you owe|total you owe the provider)\s*:?$/i,
+  due: /^(amount due|please pay|balance due|amount you owe|total you owe the provider|patient responsibility)\s*:?$/i,
 };
 
 const field = <T>(value: T | null, conf = 1, box: Box | null = null): Field<T> => ({ value, confidence: value == null ? 0 : conf, box });
@@ -171,6 +171,15 @@ export function detectDocType(text: string): DocType {
 // Label words as one string: speckle trimmed, "Guarantor /Patient" joined.
 const labelText = (ws: Word[]) => ws.map((w) => trimNoise(w.text)).join(' ').replace(/\s*\/\s*/g, '/');
 
+// Who sent it: among the first rows, one that names an organization;
+// otherwise the first row that isn't a document title or an address.
+const TITLE_ROW = /^(itemized\s+statement|statement|itemized\s+bill|patient\s+statement|explanation\s+of\s+benefits.*|this\s+is\s+not\s+a\s+bill|invoice|sample.*)$/i;
+const ORG_ROW = /\b(hospital|medical|center|centre|clinic|health|healthcare|physicians?|associates|group|plan|insurance|mutual|care|practice|laboratory|labs?|imaging|surgery)\b/i;
+export function pickProvider(rows: Row[]): Row | null {
+  const head = rows.slice(0, 6).filter((r) => !TITLE_ROW.test(r.text.trim()) && !/:/.test(r.text) && !/^\d/.test(r.text.trim()));
+  return head.find((r) => ORG_ROW.test(r.text)) ?? head[0] ?? null;
+}
+
 export function parseDocument(words: Word[], reader: string): ExtractedDocument {
   const rows = groupRows(words);
   const all = rows.map((r) => r.text).join('\n');
@@ -184,7 +193,7 @@ export function parseDocument(words: Word[], reader: string): ExtractedDocument 
   const total = labelledAnywhere(rows, LABELS.total);
   const due = labelledAnywhere(rows, LABELS.due);
   const moneyOf = (ws: Word[] | undefined) => (ws ?? []).map((w) => parseMoney(w.text)).find((m) => m != null) ?? null;
-  const top = rows[0];
+  const top = pickProvider(rows);
   // Denial letters: the first date on the page is the letter date.
   const firstDate = rows.flatMap((r) => r.words).map((w) => parseDate(w.text)).find((d) => !!d) ?? null;
 

@@ -135,7 +135,7 @@ const native = await upload(BILL_PDF, 'bill.pdf', 'application/pdf');
 check('native pdf returns 201', native.status === 201, JSON.stringify(native.json).slice(0, 200));
 check('native pdf source_format is pdf_native', native.json?.document?.source_format === 'pdf_native');
 check('native pdf extraction succeeded', native.json?.document?.extraction_status === 'extracted');
-console.log(`   model read: doc_type=${native.json?.extraction?.doc_type} amount=${native.json?.extraction?.total_amount_usd} institution=${native.json?.extraction?.institution_name}`);
+console.log(`   read (${native.json?.extraction?.reader ?? "model"}): doc_type=${native.json?.extraction?.doc_type} amount=${native.json?.extraction?.total_amount_usd} institution=${native.json?.extraction?.institution_name}`);
 check('native pdf doc_type is a known value', ['itemized_bill', 'eob', 'other'].includes(native.json?.extraction?.doc_type));
 check('native pdf found a positive patient amount', typeof native.json?.extraction?.total_amount_usd === 'number' && native.json.extraction.total_amount_usd > 0, String(native.json?.extraction?.total_amount_usd));
 const nativeRow = await docRow(native.json?.document?.id);
