@@ -5,7 +5,7 @@
 // a list price is never the best path). Pure, no network.
 // Run: npx tsx scripts/test_cash_vs_insurance.ts
 
-import { coverageFrom, decideCashVsInsurance, decisionText, STRINGS, type CashVsInsuranceInput } from '../lib/rules/cashVsInsurance';
+import { coverageFrom, decideCashVsInsurance, decisionText, LEGAL_REVIEW_REASONS, STRINGS, type CashVsInsuranceInput } from '../lib/rules/cashVsInsurance';
 import { buildCounterCard, cashDecisionNote, decisionForPath, isCounterPath } from '../lib/counterCard';
 import { buildAllowedFacts, findUnmatchedClaims } from '../lib/groundingGuard';
 import { rankPathways } from '../lib/ranking';
@@ -25,7 +25,12 @@ for (const cash of [1, 5, 500]) {
   const r = d({ coverage: 'medicaid', cashPriceUsd: cash, planCostUsd: 4, drugCoveredByPlan: 'yes' });
   check(`Medicaid covered drug, cash $${cash}: use insurance, never cash`, r.decision === 'use_insurance' && r.reason === 'medicaid_bill_medicaid_first');
 }
-check('Medicaid line is the softer one and marked pending (42 CFR text does not clearly support the strong line)', d({ coverage: 'medicaid', drugCoveredByPlan: 'yes' }).pending && /bill Medicaid first/.test(decisionText(d({ coverage: 'medicaid', drugCoveredByPlan: 'yes' }), 'en')));
+{
+  const strong = d({ coverage: 'medicaid', drugCoveredByPlan: 'yes' });
+  check('Medicaid covered drug: the owner-approved line, citing 42 CFR 447.15, says "copay" and never "small"', /only your Medicaid copay \(42 CFR 447\.15\)/.test(decisionText(strong, 'en')) && /42 CFR 447\.15/.test(decisionText(strong, 'es')) && !/small|peque/i.test(decisionText(strong, 'en') + decisionText(strong, 'es')));
+  check('Medicaid covered drug: marked for legal review before launch', strong.legalReview && LEGAL_REVIEW_REASONS.includes(strong.reason));
+  check('lines not in the legal review list are not marked', !d({ coverage: 'medicaid' }).legalReview && !d({ coverage: 'uninsured', cashPriceUsd: 10 }).legalReview);
+}
 check('Medicaid, coverage of the drug unknown: ask, never cash', d({ coverage: 'medicaid' }).decision === 'ask_patient' && d({ coverage: 'medicaid' }).questions.includes('ask_medicaid_covers'));
 check('Medicaid, drug not covered: ask to confirm the denial, never cash', d({ coverage: 'medicaid', drugCoveredByPlan: 'no' }).decision === 'ask_patient');
 check('Medicaid + drug maker program not confirmed: not offered', d({ coverage: 'medicaid', isManufacturerProgram: true }).decision === 'not_for_this_coverage');

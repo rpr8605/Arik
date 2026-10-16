@@ -10,6 +10,8 @@ Source: eCFR versioner API, Title 42 up to date as of 2026-10-14 (https://www.ec
 
 **Decision (owner rule: strong line only if the text clearly supports it):** the text supports "at a pharmacy that takes Medicaid, a covered drug costs only your Medicaid copay". It does not support "small" in every case (up to 20% for non-preferred drugs above 150% FPL), and it never tells a patient not to pay cash. So the rule ships the softer line, **marked pending**: "With Medicaid, ask the pharmacy to bill Medicaid first." Proposed accurate stronger line for the owner to approve: "At a pharmacy that takes Medicaid, a drug Medicaid covers should cost you only your Medicaid copay (42 CFR 447.15)."
 
+**Owner decision 2026-10-16:** approved the stronger line, citing 42 CFR 447.15, for a drug Medicaid covers: "At a pharmacy that takes Medicaid, a drug Medicaid covers should cost you only your Medicaid copay (42 CFR 447.15). Ask the pharmacy to bill Medicaid." It is marked for **legal review before launch** (`LEGAL_REVIEW_REASONS` in lib/rules/cashVsInsurance.ts; docs/legal_review_before_launch.md). When coverage of the drug is unknown or denied, the softer lines stay.
+
 ## Medicare Part D
 
 - **42 CFR 423.100, "Incurred costs":** costs for covered Part D drugs "not paid for under the Part D plan as a result of application of any annual deductible or other cost-sharing rules ... prior to the Part D enrollee satisfying the out-of-pocket threshold", paid by the enrollee (or certain others) and not reimbursed.

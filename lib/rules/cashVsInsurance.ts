@@ -7,10 +7,11 @@
 // Regulation basis (docs/research/cash_vs_insurance_verification.md):
 // - Medicaid, 42 CFR 447.15: participating providers accept "as payment in
 //   full, the amounts paid by the agency plus any deductible, coinsurance
-//   or copayment required by the plan". The text does not tell patients
-//   not to pay cash and copays are not always small (447.53: up to 20%
-//   for non-preferred drugs above 150% FPL), so the Medicaid line is the
-//   softer one and is marked PENDING owner approval of stronger wording.
+//   or copayment required by the plan". So at a pharmacy that takes
+//   Medicaid a covered drug costs only the Medicaid copay. The line says
+//   "copay", never "small" (447.53: up to 20% for non-preferred drugs
+//   above 150% FPL). Owner approved this stronger line 2026-10-16; it is
+//   marked for LEGAL REVIEW before launch (docs/legal_review_before_launch.md).
 // - Medicare Part D, 42 CFR 423.100 "Incurred costs": only cost sharing
 //   under the plan counts toward the out-of-pocket threshold, so a cash
 //   purchase outside the plan does not count.
@@ -35,6 +36,10 @@ export type ReasonCode =
 export type CaveatCode = 'may_not_count_toward_deductible' | 'counts_toward_deductible' | 'medicare_cash_not_counted' | 'deductible_not_met_oop';
 export type QuestionCode = 'ask_copay' | 'ask_deductible' | 'ask_coverage' | 'ask_medicaid_covers';
 
+// Reasons whose wording counsel must review before launch (owner,
+// 2026-10-16). docs/legal_review_before_launch.md lists the same set.
+export const LEGAL_REVIEW_REASONS: readonly ReasonCode[] = ['medicaid_bill_medicaid_first'];
+
 export interface CashVsInsuranceInput {
   coverage: Coverage;
   cashPriceUsd: number | null;           // sourced cash / discount / program price for the same fill
@@ -51,15 +56,15 @@ export interface CashVsInsuranceResult {
   reason: ReasonCode;
   caveats: CaveatCode[];
   questions: QuestionCode[];
-  pending: boolean;                      // wording awaiting owner approval
+  legalReview: boolean;                  // owner-approved wording that counsel must review before launch
 }
 
-const result = (decision: Decision, reason: ReasonCode, caveats: CaveatCode[] = [], questions: QuestionCode[] = [], pending = false): CashVsInsuranceResult => ({
+const result = (decision: Decision, reason: ReasonCode, caveats: CaveatCode[] = [], questions: QuestionCode[] = []): CashVsInsuranceResult => ({
   decision,
   reason,
   caveats,
   questions,
-  pending,
+  legalReview: LEGAL_REVIEW_REASONS.includes(reason),
 });
 
 export function coverageFrom(insuranceType: string | null | undefined): Coverage {
@@ -90,9 +95,9 @@ export function decideCashVsInsurance(i: CashVsInsuranceInput): CashVsInsuranceR
   // 1. Medicaid: never steered to cash for a covered drug.
   if (i.coverage === 'medicaid') {
     if (i.isManufacturerProgram && (i.federalProgramAllowed ?? 'unknown') !== 'yes') return result('not_for_this_coverage', 'federal_program_not_allowed');
-    if (i.drugCoveredByPlan === 'no') return result('ask_patient', 'medicaid_not_covered_confirm', [], ['ask_medicaid_covers'], true);
-    if (i.drugCoveredByPlan === 'yes') return result('use_insurance', 'medicaid_bill_medicaid_first', [], [], true);
-    return result('ask_patient', 'medicaid_ask_if_covered', [], ['ask_medicaid_covers'], true);
+    if (i.drugCoveredByPlan === 'no') return result('ask_patient', 'medicaid_not_covered_confirm', [], ['ask_medicaid_covers']);
+    if (i.drugCoveredByPlan === 'yes') return result('use_insurance', 'medicaid_bill_medicaid_first');
+    return result('ask_patient', 'medicaid_ask_if_covered', [], ['ask_medicaid_covers']);
   }
 
   // 2. Medicare: a drug maker's program needs an explicit yes for federal
@@ -143,7 +148,7 @@ export const STRINGS: {
     need_deductible_status: { en: 'To compare, I need to know whether you have met your deductible this year.', es: 'Para comparar, necesito saber si ya alcanzó su deducible este año.' },
     need_coverage: { en: 'Tell me what coverage you have, and I can say whether this price or your insurance is better.', es: 'Dígame qué cobertura tiene y le diré si le conviene este precio o su seguro.' },
     no_cash_price: { en: "I don't have a sourced cash price for this yet.", es: 'Todavía no tengo un precio en efectivo con fuente para esto.' },
-    medicaid_bill_medicaid_first: { en: 'With Medicaid, ask the pharmacy to bill Medicaid first.', es: 'Con Medicaid, pida a la farmacia que primero se lo cobre a Medicaid.' },
+    medicaid_bill_medicaid_first: { en: 'At a pharmacy that takes Medicaid, a drug Medicaid covers should cost you only your Medicaid copay (42 CFR 447.15). Ask the pharmacy to bill Medicaid.', es: 'En una farmacia que acepta Medicaid, un medicamento que Medicaid cubre solo debería costarle su copago de Medicaid (42 CFR 447.15). Pida a la farmacia que se lo cobre a Medicaid.' },
     medicaid_ask_if_covered: { en: 'With Medicaid, ask the pharmacy to bill Medicaid first. If Medicaid says no, tell me and we can look at other options.', es: 'Con Medicaid, pida a la farmacia que primero se lo cobre a Medicaid. Si Medicaid dice que no, dígamelo y buscamos otras opciones.' },
     medicaid_not_covered_confirm: { en: 'If the pharmacy billed Medicaid and it was turned down, tell me and we can look at other options.', es: 'Si la farmacia se lo cobró a Medicaid y lo rechazaron, dígamelo y buscamos otras opciones.' },
     federal_program_not_allowed: { en: "This drug maker's program isn't offered here for Medicare or Medicaid until Arik confirms the program allows it.", es: 'Este programa del fabricante no se ofrece aquí para Medicare o Medicaid hasta que Arik confirme que el programa lo permite.' },

@@ -182,8 +182,10 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   db/039 loaded by `npm run ingest -- bill_refs` (numbers only, no CPT
   descriptions). NCCI pair files and the OPPS/CLFS fee files sit behind
   the AMA license page on cms.gov and are NOT downloaded: pairs load only
-  via `--ptp-dir` after the owner accepts that license; until then the
-  pair check finds nothing. Letters: `lib/letters/` (every fact written by
+  via `--ptp-dir` after the owner accepts that license. **Owner decision
+  2026-10-16: the license is NOT accepted (counsel is asked first). Do not
+  download or load the pair files; on real data the pair check returns
+  nothing, by design** (docs/legal_review_before_launch.md). Letters: `lib/letters/` (every fact written by
   code; `LETTER_MODEL_SENTENCE=true` adds one guarded tone sentence, the
   model is told no patient data); freeze = sha256 + pdf-lib PDF, and a DB
   trigger refuses edits to a frozen letter's content. Routes:
@@ -383,8 +385,10 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   - `rules/cashVsInsurance.ts` + `counterCard.ts` — cash vs insurance
     (2026-10-16, docs/kimi/PLAN_CASH_VS_INSURANCE.md; regulation quotes
     in docs/research/cash_vs_insurance_verification.md): codes + one EN/ES
-    string table, decided in code. Medicaid never steered to cash (line
-    is the softer "bill Medicaid first", marked pending owner approval);
+    string table, decided in code. Medicaid never steered to cash; a covered
+    drug gets the owner-approved line citing 42 CFR 447.15 ("should cost
+    you only your Medicaid copay"), marked `legalReview` for counsel before
+    launch (`LEGAL_REVIEW_REASONS`; docs/legal_review_before_launch.md);
     Medicare always gets the Part D limit caveat; commercial asks for
     plan cost and deductible status. Ranking: a drug maker's program is
     pending for Medicare/Medicaid until `exploits.federal_program_allowed`
