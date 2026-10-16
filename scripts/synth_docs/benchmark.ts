@@ -22,6 +22,7 @@ const arg = (k: string, d: string) => {
 const readerName = arg('--reader', 'on-server');
 const limit = Number(arg('--limit', '60'));
 const budget = Number(arg('--budget', '1.9'));
+const concurrency = Number(arg('--concurrency', readerName === 'vision' ? '4' : '1'));
 
 let spend = 0;
 const price = MODEL_TIERS.extraction.maxPrice;
@@ -83,7 +84,8 @@ function score(q: string, truth: any, out: ExtractedDocument) {
       bump(q, 'line.found', !!m);
       bump(q, 'line.code', !!m && norm(m.code) === norm(w.code));
       bump(q, 'line.date', !!m && m.date === w.date);
-      bump(q, 'line.units', !!m && m.units === w.units);
+      // EOBs print no units column, so units are scored on bills only.
+      if (truth.docType === 'itemized_bill') bump(q, 'line.units', !!m && m.units === w.units);
       bump(q, 'line.charge', !!m);
     }
   }
@@ -95,12 +97,17 @@ async function main() {
   let done = 0;
   let stoppedForBudget = false;
   const perDoc: { id: string; quality: string; ms: number; error?: string }[] = [];
-  for (const tf of truths) {
+  let next = 0;
+  // Each worker takes the next document. The budget check runs before every
+  // call, so the overshoot is at most (concurrency - 1) documents' cost.
+  const worker = async () => {
+  while (next < truths.length) {
+    const tf = truths[next++];
     if (readerName === 'vision' && spend >= budget) {
       stoppedForBudget = true;
       break;
     }
-    if (Date.now() - t0 > 200_000) break; // stay inside the 4-minute rule; rerun with --skip to continue
+    if (Date.now() - t0 > 200_000) break; // stay inside the 4-minute rule
     const truth = JSON.parse(readFileSync(join(DIR, tf), 'utf8'));
     const bytes = readFileSync(join(DIR, truth.file));
     const doc: SourceDocument = { bytes: new Uint8Array(bytes), mime: truth.file.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg', filename: truth.file, origin: 'synthetic' };
@@ -114,6 +121,8 @@ async function main() {
     }
     done++;
   }
+  };
+  await Promise.all(Array.from({ length: concurrency }, worker));
   await terminateOcr();
   const pct = (t: { ok: number; n: number }) => `${Math.round((t.ok / t.n) * 100)}% (${t.ok}/${t.n})`;
   const summary = Object.fromEntries(Object.entries(tally).map(([q, t]) => [q, Object.fromEntries(Object.entries(t).map(([f, v]) => [f, pct(v)]))]));
