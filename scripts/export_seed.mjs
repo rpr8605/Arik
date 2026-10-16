@@ -82,14 +82,32 @@ const nadac = await q(
     where ps.name = 'nadac' and p.pharmacy_id is null`,
 );
 const zips = await q(`select z.zip, z.lat, z.lng, s.title as src_title, s.url as src_url from zip_centroids z left join sources s on s.id = z.source_id`);
+// free_data_loaders.md Part A and B (db/035, db/036).
+const denial = await q(`select d.*, s.title as src_title, s.url as src_url from payer_denial_stats d join sources s on s.id = d.source_id`);
+const policies = await q(`select p.*, s.title as src_title, s.url as src_url from policy_documents p join sources s on s.id = p.source_id`);
+const extraSources = await q(
+  `select distinct s.source_type, s.title, s.url, s.evidence_grade, s.effective_date::text, s.retrieved_at, s.last_verified_at
+     from sources s where s.id in (select source_id from payer_denial_stats union select source_id from policy_documents)`,
+);
 await c.end();
+const DENIAL_COLS = ['market', 'state', 'issuer_id', 'issuer_name', 'plan_year', 'file_year', 'claims_received_in', 'claims_received_out', 'claims_denied_in', 'claims_denied_out',
+  'claims_resubmitted_in', 'claims_resubmitted_out', 'internal_appeals_filed', 'internal_appeals_overturned', 'external_appeals_filed', 'external_appeals_overturned',
+  'denied_prior_auth', 'denied_out_of_network', 'denied_excluded_service', 'denied_not_medically_necessary', 'denied_not_medically_necessary_bh', 'denied_benefit_limit',
+  'denied_member_not_covered', 'denied_investigational', 'denied_administrative', 'denied_other', 'plans_count', 'reasons_partial'];
+const POLICY_COLS = ['doc_type', 'doc_id', 'version', 'display_id', 'title', 'status', 'is_draft', 'national', 'contractors', 'jurisdictions', 'effective_date', 'retirement_date',
+  'hcpcs_codes', 'icd10_codes_count', 'citation_excerpt', 'related_documents', 'source_url', 'retrieved_date', 'next_check_date'];
+for (const r of denial) r.value_flags = JSON.stringify(r.value_flags ?? {});
+for (const r of policies) {
+  for (const k of ['effective_date', 'retirement_date', 'retrieved_date', 'next_check_date']) r[k] = r[k] instanceof Date ? r[k].toISOString().slice(0, 10) : r[k];
+}
 
-const sql = `-- Arik drug data export (scripts/export_seed.mjs), ${new Date().toISOString()}
--- Rows: ${ranked.length} ranked, ${drugs.length} drugs, ${ndcs.length} NDCs, ${nadac.length} NADAC prices, ${zips.length} zip centroids, ${sourceRows.length} sources.
--- Needs db/031, db/032 (and db/033 for Imbruvica) applied first. Idempotent.
+const sql = `-- Arik data export (scripts/export_seed.mjs), ${new Date().toISOString()}
+-- Rows: ${ranked.length} ranked, ${drugs.length} drugs, ${ndcs.length} NDCs, ${nadac.length} NADAC prices, ${zips.length} zip centroids,
+--       ${denial.length} insurer denial rows, ${policies.length} Medicare coverage documents, ${sourceRows.length + extraSources.length} sources.
+-- Needs db/031 to db/036 applied first. Idempotent.
 
 create temp table x_sources (source_type text, title text, url text, evidence_grade text, effective_date date, retrieved_at timestamptz, last_verified_at timestamptz) on commit drop;
-${load('x_sources', ['source_type', 'title', 'url', 'evidence_grade', 'effective_date', 'retrieved_at', 'last_verified_at'], sourceRows)}
+${load('x_sources', ['source_type', 'title', 'url', 'evidence_grade', 'effective_date', 'retrieved_at', 'last_verified_at'], [...sourceRows, ...extraSources])}
 insert into sources (source_type, title, url, evidence_grade, effective_date, retrieved_at, last_verified_at)
 select x.* from x_sources x where not exists (select 1 from sources s where s.title = x.title and s.url is not distinct from x.url);
 update sources s set retrieved_at = x.retrieved_at, last_verified_at = x.last_verified_at
@@ -139,8 +157,31 @@ insert into zip_centroids (zip, lat, lng, source_id)
 select x.zip, x.lat, x.lng, (select id from sources s where s.title = x.src_title and s.url is not distinct from x.src_url order by retrieved_at limit 1)
   from x_zips x
 on conflict (zip) do update set lat = excluded.lat, lng = excluded.lng, source_id = excluded.source_id;
+
+create temp table x_denial (${DENIAL_COLS.map((k) => `${k} text`).join(', ')}, value_flags text, src_title text, src_url text) on commit drop;
+${load('x_denial', [...DENIAL_COLS, 'value_flags', 'src_title', 'src_url'], denial)}
+insert into payer_denial_stats (${DENIAL_COLS.join(', ')}, value_flags, source_id)
+select ${DENIAL_COLS.map((k) => (['market', 'state', 'issuer_id', 'issuer_name'].includes(k) ? `x.${k}` : k === 'reasons_partial' ? `x.${k}::boolean` : ['plan_year', 'file_year', 'plans_count'].includes(k) ? `x.${k}::int` : `x.${k}::bigint`)).join(', ')},
+       x.value_flags::jsonb,
+       (select id from sources s where s.title = x.src_title and s.url is not distinct from x.src_url order by retrieved_at limit 1)
+  from x_denial x
+on conflict (market, state, issuer_id, plan_year) do update set
+  ${DENIAL_COLS.filter((k) => !['market', 'state', 'issuer_id', 'plan_year'].includes(k)).map((k) => `${k} = excluded.${k}`).join(', ')},
+  value_flags = excluded.value_flags, source_id = excluded.source_id;
+
+create temp table x_policy (doc_type text, doc_id text, version int, display_id text, title text, status text, is_draft boolean, national boolean,
+  contractors text[], jurisdictions text[], effective_date date, retirement_date date, hcpcs_codes text[], icd10_codes_count int, citation_excerpt text,
+  related_documents text[], source_url text, retrieved_date date, next_check_date date, src_title text, src_url text) on commit drop;
+${load('x_policy', [...POLICY_COLS, 'src_title', 'src_url'], policies)}
+insert into policy_documents (${POLICY_COLS.join(', ')}, source_id)
+select ${POLICY_COLS.map((k) => `x.${k}`).join(', ')},
+       (select id from sources s where s.title = x.src_title and s.url is not distinct from x.src_url order by retrieved_at limit 1)
+  from x_policy x
+on conflict (doc_type, doc_id) do update set
+  ${POLICY_COLS.filter((k) => !['doc_type', 'doc_id'].includes(k)).map((k) => `${k} = excluded.${k}`).join(', ')}, source_id = excluded.source_id;
+delete from policy_documents p where not exists (select 1 from x_policy x where x.doc_type = p.doc_type and x.doc_id = p.doc_id);
 `;
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, sql);
-console.log(`export: ${ranked.length} ranked, ${drugs.length} drugs, ${ndcs.length} NDCs, ${nadac.length} NADAC prices, ${zips.length} zips, ${sourceRows.length} sources -> ${OUT} (${(statSync(OUT).size / 1048576).toFixed(1)} MB)`);
+console.log(`export: ${ranked.length} ranked, ${drugs.length} drugs, ${ndcs.length} NDCs, ${nadac.length} NADAC prices, ${zips.length} zips, ${denial.length} denial rows, ${policies.length} coverage documents, ${sourceRows.length + extraSources.length} sources -> ${OUT} (${(statSync(OUT).size / 1048576).toFixed(1)} MB)`);

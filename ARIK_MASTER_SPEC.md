@@ -416,7 +416,7 @@ Phased: v1 (S3) prepares and tracks, nothing leaves the system; v2 (S5) sends fo
 | M13-AC4 | Medicare Coverage Database loader (CPT license terms respected) | S5 |
 | M13-AC5 | Automated staleness job replacing the manual script | S5 |
 
-**Status:** all MISSING.
+**Status (2026-10-16):** AC1 DONE (db/036 `policy_documents`: source, retrieved date, next check date; one row per current NCD/LCD/Article). AC4 DONE locally (`npm run ingest -- mcd`: 3,382 documents; codes only, CPT/HCPCS descriptions never stored; drafts and retired rules never offered; `getCoverageRule` in lib/data/coverageData.ts; test_coverage_data.ts). Weekly job documented in docs/data_refresh_schedule.md, not deployed. Also done ahead of S5 (free_data_loaders.md Part A): insurer denial stats from the CMS TiC PUF and the prior auth metrics template (db/035). AC2, AC3, AC5 MISSING.
 
 ### M14. Insurance profile and lookup
 

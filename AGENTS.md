@@ -73,8 +73,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/029_program_phones.sql` → `db/030_bmspaf_medicare_terms.sql`
 → `db/031_pricing_s2_closeout.sql` → `db/032_drug_data.sql`
 → `db/033_imbruvica_negotiated_price.sql` → `db/034_routing_partners.sql`
-→ `db/035_denial_data.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–035
+→ `db/035_denial_data.sql` → `db/036_policy_documents.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–036
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -364,6 +364,15 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     ingest_prices.ts); runs log to `ingest_runs.dataset` (db/035). The
     grounding guard's rule 5 rejects "X% chance your claim is denied"
     style text. Test: `test_denial_data.ts`.
+    Part B: `coverage.ts` (pure: MCD tables -> one record per current
+    NCD/LCD/Article per the MCD data dictionary; states from contractor
+    jurisdictions when a document has several contractors, else its
+    primary jurisdiction; drafts = display_id set; codes only),
+    `coverageData.ts` (`getCoverageRule(codeOrName, state)`), loader
+    `npm run ingest -- mcd` (scripts/load_coverage_data.ts, replaces the
+    current set; db/036). Refresh cadence for every source:
+    docs/data_refresh_schedule.md. `export_seed.mjs` now also carries
+    payer_denial_stats and policy_documents. Test: `test_coverage_data.ts`.
   - `pricing/adapter.ts` — source-agnostic `PriceSourceAdapter` contract
     (fetch/normalize → `NormalizedPrice`; rejects are logged, never
     coerced), `pricing/adapters/` (registry + `nadac.ts`; field mapping

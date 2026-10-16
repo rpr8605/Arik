@@ -75,17 +75,20 @@ try {
     select to_regclass('public.drug_rank_list') is not null as rank_list,
            to_regclass('public.drug_ndcs') is not null as ndcs,
            to_regclass('public.zip_centroids') is not null as zips,
+           to_regclass('public.payer_denial_stats') is not null as denial_stats,
+           to_regclass('public.policy_documents') is not null as policy_documents,
            exists (select 1 from information_schema.columns where table_name = 'price_points' and column_name = 'rate_class') as rate_class,
            exists (select 1 from pg_indexes where indexname = 'price_points_ingest_natural_pharmacy') as pharmacy_key,
            exists (select 1 from price_sources where name = 'nadac') as nadac_source`);
   const missing = Object.entries(need.rows[0]).filter(([, ok]) => !ok).map(([k]) => k);
   if (missing.length) {
-    console.error(`stop: the target is missing ${missing.join(', ')}. Apply db/031 and db/032 first.`);
+    console.error(`stop: the target is missing ${missing.join(', ')}. Apply db/031 to db/036 first.`);
     process.exit(1);
   }
   const counts = async () =>
     (await c.query(`select (select count(*) from drugs) drugs, (select count(*) from drug_rank_list) ranked, (select count(*) from drug_ndcs) ndcs,
                            (select count(*) from price_points where price_type = 'acquisition_benchmark') nadac, (select count(*) from zip_centroids) zips,
+                           (select count(*) from payer_denial_stats) denial, (select count(*) from policy_documents) policies,
                            pg_database_size(current_database()) bytes`)).rows[0];
   const before = await counts();
   await c.query('begin');
@@ -93,7 +96,7 @@ try {
   await c.query(readFileSync(file, 'utf8'));
   const after = await counts();
   console.log(`target: ${local ? 'local test database' : 'Arik demo database'}; applied in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-  for (const k of ['drugs', 'ranked', 'ndcs', 'nadac', 'zips']) console.log(`  ${k.padEnd(7)} ${before[k]} -> ${after[k]}`);
+  for (const k of ['drugs', 'ranked', 'ndcs', 'nadac', 'zips', 'denial', 'policies']) console.log(`  ${k.padEnd(7)} ${before[k]} -> ${after[k]}`);
   console.log(`  size    ${mb(before.bytes)} -> ${mb(after.bytes)} of ${mb(FREE_PLAN_BYTES)} (free plan)`);
   if (Number(after.bytes) > FREE_PLAN_BYTES * 0.8) {
     await c.query('rollback');
