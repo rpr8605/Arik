@@ -54,6 +54,10 @@ export interface RankingResult {
   blocked: { title: string; reason: string }[];
   stateNote: { status: string; headline: string; detail: string | null } | null;
   winner: RankedPathway | null;
+  // One-time offers (a free first fill): a bridge while an ongoing path is
+  // set up. Kept OUT of `ranked` so a $0 trial never reads as "$0 a year";
+  // a bridge carries no yearly figure and is never the winner.
+  bridges: RankedPathway[];
   // db/022 enforcement: fresh-source prices withheld because they were
   // expired, disabled, or past the source's max_staleness_hours. The
   // response says which - an exclusion is an answer, not an omission.
@@ -167,6 +171,7 @@ export function rankPathways(input: {
   const pendingVerification: RankingResult['pendingVerification'] = [];
   const notApplicable: RankingResult['notApplicable'] = [];
   const ranked: RankedPathway[] = [];
+  const bridges: RankedPathway[] = [];
 
   for (const e of viable) {
     if (e.status === 'closed') {
@@ -224,12 +229,12 @@ export function rankPathways(input: {
     }
     if (isCard(e) && stateNote) notes.push(stateNote.headline);
     if (oneTime) notes.push('One-time offer: a bridge, not a long-term answer; pair it with a monthly pathway.');
-    ranked.push({
+    (oneTime ? bridges : ranked).push({
       kind: e.exploit_type,
       title: e.title,
       monthlyCostUsd: monthly,
       priceSemantics: e.patient_price_type ?? null,
-      projectedAnnualCostUsd: monthly != null ? (oneTime ? monthly : monthly * 12) : null,
+      projectedAnnualCostUsd: oneTime || monthly == null ? null : monthly * 12,
       oneTime,
       trajectoryNotes: notes,
       verificationStatus: e.verification_status,
@@ -267,10 +272,11 @@ export function rankPathways(input: {
   ranked.push(...pricePathways);
 
   ranked.sort((a, b) => (a.projectedAnnualCostUsd ?? Infinity) - (b.projectedAnnualCostUsd ?? Infinity));
-  // WINNER: lowest projected 3-12 month cost among confident, non-one-time
-  // pathways. A one-time $0 trial is never the "winner" - it's a bridge.
-  const winner = ranked.find((p) => !p.oneTime && p.projectedAnnualCostUsd != null) ?? null;
-  return { ranked, pendingVerification, notApplicable, blocked, stateNote, winner, excludedPrices };
+  bridges.sort((a, b) => (a.monthlyCostUsd ?? Infinity) - (b.monthlyCostUsd ?? Infinity));
+  // WINNER: lowest projected 3-12 month cost among ongoing pathways.
+  // Bridges never enter `ranked`, so a one-time trial can't win.
+  const winner = ranked.find((p) => p.projectedAnnualCostUsd != null) ?? null;
+  return { ranked, bridges, pendingVerification, notApplicable, blocked, stateNote, winner, excludedPrices };
 }
 
 function bestMonthlyPrice(pricePoints: any[]): number | null {

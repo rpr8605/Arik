@@ -18,9 +18,10 @@ export function sourceLabel(title: string | null | undefined): string {
   return title.split(dash).map((s) => s.trim()).join(': ').replace(/\s+/g, ' ').trim();
 }
 
-// The best ongoing path: the engine's order, skipping one-time offers.
+// The best ongoing path: the engine's winner. One-time offers live in
+// ranking.bridges and are shown after the ongoing options.
 export function bestOngoing(data: RxOptions): RankedPathway | null {
-  return data.ranking?.ranked.find((p) => !p.oneTime) ?? null;
+  return data.ranking?.winner ?? data.ranking?.ranked[0] ?? null;
 }
 
 // A one-time offer (a free trial fill) is a bridge, not a monthly price,
@@ -43,7 +44,7 @@ function checked(d: string | null | undefined): string {
 // scripted; if a price isn't loaded the card says so.
 export function RxResults({ data }: { data: RxOptions }) {
   const r = data.ranking;
-  if (!data.found || !r || (r.ranked.length === 0 && r.pendingVerification.length === 0 && r.blocked.length === 0)) {
+  if (!data.found || !r || (r.ranked.length === 0 && r.bridges.length === 0 && r.pendingVerification.length === 0 && r.blocked.length === 0)) {
     return (
       <div className="rx-card">
         <p>
@@ -58,9 +59,9 @@ export function RxResults({ data }: { data: RxOptions }) {
       <p className="rx-head">
         <strong>{data.drug}</strong>: options ranked by what you&apos;d really pay over the next year
       </p>
-      {r.ranked.length > 0 ? (
+      {r.ranked.length + r.bridges.length > 0 ? (
         <ol className="rx-list">
-          {r.ranked.map((p) => (
+          {[...r.ranked, ...r.bridges].map((p) => (
             <li key={p.title} className={p === best ? 'rx-best' : undefined}>
               {p === best ? <span className="tag">Best path</span> : p.oneTime ? <span className="tag">Bridge</span> : null}
               <strong>{cap(p.title)}</strong>
@@ -112,7 +113,7 @@ export function RxResults({ data }: { data: RxOptions }) {
 // ranking (no model call), then the call card.
 export function bestPathText(data: RxOptions, sample: SamplePatient): string {
   const w = bestOngoing(data);
-  const bridge = data.ranking?.ranked.find((p) => p.oneTime) ?? null;
+  const bridge = data.ranking?.bridges[0] ?? null;
   const who = sample.subject.caringFor ? `for ${sample.subject.caringFor.name}` : 'for you';
   if (!w) {
     return data.ranking?.blocked.length

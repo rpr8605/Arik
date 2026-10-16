@@ -202,7 +202,9 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
     `lib/pricing/enforcement.ts` before pathway construction, excluded
     stale rows are reported on the result as `excludedPrices`, and
     `acquisition_benchmark` rows (NADAC-type) never rank as pathways —
-    benchmarks are not patient prices.
+    benchmarks are not patient prices. One-time offers (free first fill) go
+    to `bridges`, never `ranked`: no yearly figure, never the winner; the
+    trust receipt and fallback word them as first-fill bridges (2026-10-15).
   - `extractedFacts.ts` — Feature A merge step (built 2026-07-28): every
     extracted fact → durable profile/case/med row immediately;
     contradictions park in `pending_fact_corrections` (never silent

@@ -1,4 +1,5 @@
 // Pure tests for lib/ranking.ts. Run: npx tsx scripts/test_ranking.ts
+import { buildFallbackOptions, buildTrustReceipt } from '../lib/trustReceipt';
 import { rankPathways } from '../lib/ranking';
 
 let failures = 0;
@@ -45,7 +46,28 @@ check('conflicted card appears in pendingVerification with no number', r.pending
 // trial must not beat the $345/mo DTP as the long-term winner.
 r = rankPathways({ exploits: [trial, dtp], pricePoints: [], stateRow: IA, banApplies: true, patient: { insuranceType: 'uninsured', stateCode: 'IA' } });
 check('winner is the DTP (trajectory), not the one-time trial', r.winner?.title === 'DTP', String(r.winner?.title));
-check('trial flagged one-time bridge', r.ranked.find((p) => p.title === 'Trial')?.oneTime === true);
+check('trial flagged one-time bridge', r.bridges.find((p) => p.title === 'Trial')?.oneTime === true);
+// Free-trial fix (2026-10-15): a one-time offer is a bridge, shown apart
+// from ongoing cost. It never reads as "$0 a year" and never ranks first.
+check('trial is NOT in the ongoing ranked list', !r.ranked.some((p) => p.oneTime || p.title === 'Trial'));
+check('trial carries no yearly figure', r.bridges.every((p) => p.projectedAnnualCostUsd === null));
+check('ongoing list starts with the DTP, not the $0 trial', r.ranked[0]?.title === 'DTP' && r.ranked[0]?.projectedAnnualCostUsd === 4140);
+check('trial still keeps its first-fill price and bridge note', r.bridges[0]?.monthlyCostUsd === 0 && r.bridges[0]?.trajectoryNotes.some((n) => /bridge/.test(n)));
+const onlyTrial = rankPathways({ exploits: [trial], pricePoints: [], stateRow: IA, banApplies: true, patient: { insuranceType: 'uninsured', stateCode: 'IA' } });
+check('trial alone: no winner, nothing ongoing, one bridge', onlyTrial.winner === null && onlyTrial.ranked.length === 0 && onlyTrial.bridges.length === 1);
+// The real chat builds its receipt and fallback from this same result
+// (app/api/chat/route.ts -> buildTrustReceipt / buildFallbackOptions).
+for (const lang of ['en', 'es'] as const) {
+  const receipt = buildTrustReceipt({ ranking: r, lang });
+  const fallback = buildFallbackOptions({ ranking: r, lang });
+  check(`chat receipt (${lang}): no "$0" yearly or monthly line for the trial`, !/\$0\/(month|mes)|\(\$0\/(year|año)\)/.test(receipt), receipt);
+  check(`chat receipt (${lang}): trial listed as a one-time first-fill bridge`, /Trial: \$0 (for the first fill only|solo por la primera recarga)/.test(receipt));
+  check(`chat fallback (${lang}): option 1 is the DTP, trial shown as a bridge`, /^1\. DTP/m.test(fallback) && /Trial - \$0 (for the first fill only|solo por la primera recarga)/.test(fallback) && !/\$0\/(month|mes)/.test(fallback), fallback);
+}
+// An older caller that still passes a one-time row among the ongoing ones
+// gets bridge wording, never a yearly figure.
+const legacy = buildTrustReceipt({ ranking: { ranked: [{ title: 'Trial', monthlyCostUsd: 0, projectedAnnualCostUsd: 0, oneTime: true, source: null }] }, lang: 'en' });
+check('legacy shape: one-time row still worded as a bridge', /One-time bridge/.test(legacy) && !/\$0\/month/.test(legacy));
 
 // 4. State pairing rule.
 r = rankPathways({ exploits: [card()], pricePoints: pricePts, stateRow: TX, banApplies: true, patient: { insuranceType: 'employer', stateCode: 'TX' } });

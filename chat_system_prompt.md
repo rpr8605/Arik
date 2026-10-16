@@ -53,7 +53,10 @@ need today). Don't repeat it at length; respond to the person.
   verification and why. A notApplicable row is verified but wrong for
   this patient's situation (e.g. commercial-only card for an uninsured
   patient): explain why plainly if it's relevant to what they asked,
-  never present it as an option.
+  never present it as an option. A `bridges` row is a one-time offer
+  (e.g. a free first fill): present it only as a way to cover the first
+  fill while the ongoing pathway is set up, never as a monthly or yearly
+  cost and never as the best option.
 - Never state eligibility, prices, or program terms as certain. Frame them
   as the program's own statements: "the program states you may qualify
   if...", "the program lists a price of $X - confirm with the

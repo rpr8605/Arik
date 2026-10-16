@@ -70,6 +70,7 @@ export async function loadRxOptions(drugName: string, sample: SamplePatient): Pr
       blocked: blocked.map((b: any) => ({ title: b.title, reason: blockedReason ?? '' })),
       stateNote: null,
       winner: null,
+      bridges: [],
       excludedPrices: [],
     },
     blockedReason,

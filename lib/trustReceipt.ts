@@ -24,6 +24,8 @@ const T = {
     source: (title: string, verified: string | null) =>
       `Source: ${title}${verified ? `, verified ${verified.slice(0, 10)}` : ', verification date not on file'}.`,
     pending: 'Pending verification (no number trusted yet):',
+    bridge: 'One-time bridge, first fill only (not an ongoing cost):',
+    firstFill: (m: string) => `$${m} for the first fill only`,
     blocked: 'Not offered for your coverage:',
     withheld: 'Withheld as stale or not display-permitted:',
     missing: 'Still missing:',
@@ -40,6 +42,8 @@ const T = {
     source: (title: string, verified: string | null) =>
       `Fuente: ${title}${verified ? `, verificado ${verified.slice(0, 10)}` : ', fecha de verificación no registrada'}.`,
     pending: 'Pendiente de verificación (ningún número confirmado aún):',
+    bridge: 'Puente de una sola vez, solo la primera recarga (no es un costo continuo):',
+    firstFill: (m: string) => `$${m} solo por la primera recarga`,
     blocked: 'No disponible para su cobertura:',
     withheld: 'Retenido por desactualizado o no permitido:',
     missing: 'Aún falta:',
@@ -57,7 +61,16 @@ function money(n: number | null | undefined): string | null {
   return n == null ? null : Number(n.toFixed(2)).toLocaleString('en-US');
 }
 
+// A one-time offer never gets a monthly or yearly figure, even if an
+// older caller still passes it among the ongoing pathways.
+function bridgeLine(p: PathwayLike, s: Strings): string {
+  const m = money(p.monthlyCostUsd);
+  const src = p.source?.title ?? 'source not linked';
+  return `- ${s.bridge} ${p.title}${m ? `: ${s.firstFill(m)}` : ''}. ${s.source(src, p.source?.last_verified_at ?? null)}`;
+}
+
 function pathwayLine(p: PathwayLike, s: Strings): string {
+  if (p.oneTime) return bridgeLine(p, s);
   const m = money(p.monthlyCostUsd);
   const price =
     p.priceSemantics === 'as_low_as' && m
@@ -72,6 +85,7 @@ function pathwayLine(p: PathwayLike, s: Strings): string {
 export function buildTrustReceipt(input: {
   ranking: {
     ranked?: PathwayLike[];
+    bridges?: PathwayLike[];
     pendingVerification?: { title: string; reason: string }[];
     blocked?: { title: string; reason: string }[];
     excludedPrices?: { label: string; reason: string }[];
@@ -87,10 +101,11 @@ export function buildTrustReceipt(input: {
   } else if ((input.exploits?.length ?? 0) > 0) {
     for (const e of input.exploits!) lines.push(pathwayLine(e, s));
   }
+  for (const b of r?.bridges ?? []) lines.push(bridgeLine(b, s));
   for (const p of r?.pendingVerification ?? []) lines.push(`${s.pending} ${p.title} - ${p.reason}`);
   for (const b of r?.blocked ?? []) lines.push(`${s.blocked} ${b.title}.`);
   for (const x of r?.excludedPrices ?? []) lines.push(`${s.withheld} ${x.label} (${x.reason}).`);
-  const gaps = (r?.ranked ?? []).filter((p) => !p.source?.title).map((p) => p.title);
+  const gaps = [...(r?.ranked ?? []), ...(r?.bridges ?? [])].filter((p) => !p.source?.title).map((p) => p.title);
   lines.push(`${s.missing} ${gaps.length ? gaps.join('; ') : s.missingNone}`);
   return lines.join('\n');
 }
@@ -98,16 +113,21 @@ export function buildTrustReceipt(input: {
 // Deterministic fallback answer for the grounding guard: options straight
 // from the engine, no model wording. Boundary line included.
 export function buildFallbackOptions(input: {
-  ranking: { ranked?: PathwayLike[] } | null;
+  ranking: { ranked?: PathwayLike[]; bridges?: PathwayLike[] } | null;
   lang: 'en' | 'es';
 }): string {
   const s = T[input.lang];
-  const ranked = input.ranking?.ranked ?? [];
-  const lines: string[] = [ranked.length ? s.fallbackLead : s.fallbackNone];
+  const ranked = (input.ranking?.ranked ?? []).filter((p) => !p.oneTime);
+  const bridges = [...(input.ranking?.bridges ?? []), ...(input.ranking?.ranked ?? []).filter((p) => p.oneTime)];
+  const lines: string[] = [ranked.length || bridges.length ? s.fallbackLead : s.fallbackNone];
   ranked.forEach((p, i) => {
     const m = money(p.monthlyCostUsd);
     lines.push(`${i + 1}. ${p.title}${m ? ` - ${s.perMonth(m, money(p.projectedAnnualCostUsd ?? null))}` : ''}`);
   });
+  for (const b of bridges) {
+    const m = money(b.monthlyCostUsd);
+    lines.push(`${s.bridge} ${b.title}${m ? ` - ${s.firstFill(m)}` : ''}`);
+  }
   lines.push('', s.boundary);
   return lines.join('\n');
 }
