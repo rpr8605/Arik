@@ -47,6 +47,7 @@ import { getCaseSample, listSampleCases, openSampleCase, resetSampleSession, tou
 import { isDemoMode } from './demo/samples';
 import { loadRxOptions } from './demo/rxOptions';
 import { confirmAndReview, createLetter, editLetter, freezeLetter, getCaseDocument, getLetter } from './production/billReview';
+import { confirmDenial, createDenialLetter, getDenialView } from './production/denialReview';
 
 export const apiDeps = {
   getUserId,
@@ -101,6 +102,10 @@ export const apiDeps = {
   getLetter,
   editLetter,
   freezeLetter,
+  // The real denial path (Phase 5, lib/production/denialReview.ts).
+  confirmDenial,
+  getDenialView,
+  createDenialLetter,
 };
 
 export function unauthorized() {

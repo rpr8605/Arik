@@ -163,7 +163,7 @@ function labelledAnywhere(rows: Row[], re: RegExp): { words: Word[]; row: Row } 
 export function detectDocType(text: string): DocType {
   const t = text.toLowerCase();
   if (/explanation of benefits|this is not a bill/.test(t)) return 'eob';
-  if (/right to appeal|not able to approve|our decision|appeal must/.test(t)) return 'denial_letter';
+  if (/right to appeal|not able to approve|our decision|appeal must|we denied|has been denied|notice of denial|denial of (?:coverage|payment)|coverage determination|organization determination|you can appeal/.test(t)) return 'denial_letter';
   if (/itemized|statement|description/.test(t) && /\$\s?\d/.test(t)) return 'itemized_bill';
   return 'unknown';
 }
@@ -236,5 +236,5 @@ export function parseDocument(words: Word[], reader: string): ExtractedDocument 
       box: r.box,
     });
   }
-  return { docType, header, lines, reader, textChars: all.replace(/\s/g, '').length };
+  return { docType, header, lines, reader, textChars: all.replace(/\s/g, '').length, ...(docType === 'denial_letter' || docType === 'eob' ? { text: all } : {}) };
 }

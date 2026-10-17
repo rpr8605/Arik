@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import type { ExtractedDocument } from '@/lib/production/types';
 import { BillReview } from './BillReview';
+import { DenialReview } from './DenialReview';
 
 // Document types in plain words (never the internal type name).
 const DOC_WORDS: Record<string, string> = {
@@ -28,6 +29,8 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
   const [error, setError] = useState<string | null>(null);
   // A bill read line by line on the server: the patient checks it next.
   const [review, setReview] = useState<{ documentId: string; reading: ExtractedDocument } | null>(null);
+  // A denial letter or EOB with readable text: the patient checks it next.
+  const [denialDoc, setDenialDoc] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -36,6 +39,7 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
     setError(null);
     setResult(null);
     setReview(null);
+    setDenialDoc(null);
     try {
       const {
         data: { session },
@@ -70,6 +74,7 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
       setResult(parts.join('. '));
       const layout = json.extraction?.layout as ExtractedDocument | undefined;
       if (layout && json.document.doc_type === 'itemized_bill' && layout.lines.length) setReview({ documentId: json.document.id, reading: layout });
+      if (layout?.text && layout.docType === 'denial_letter') setDenialDoc(json.document.id);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -124,6 +129,7 @@ export function DocumentUpload({ caseId }: { caseId: string }) {
       )}
       {error && <p role="alert">{error}</p>}
       {review && <BillReview caseId={caseId} documentId={review.documentId} reading={review.reading} />}
+      {denialDoc && <DenialReview caseId={caseId} documentId={denialDoc} />}
     </section>
   );
 }

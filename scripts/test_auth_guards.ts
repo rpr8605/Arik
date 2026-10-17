@@ -35,6 +35,7 @@ import { POST as samplesResetPost } from '../app/api/demo/samples/reset/route';
 import { GET as rxGet } from '../app/api/demo/rx/route';
 import { GET as confirmGet, POST as confirmPost } from '../app/api/cases/[id]/documents/[docId]/confirm/route';
 import { POST as lettersPost } from '../app/api/cases/[id]/letters/route';
+import { GET as denialGet, POST as denialPost } from '../app/api/cases/[id]/documents/[docId]/denial/route';
 import { GET as letterGet, PATCH as letterPatch } from '../app/api/cases/[id]/letters/[letterId]/route';
 
 let failures = 0;
@@ -539,12 +540,15 @@ async function billPath() {
     ['letters POST', () => lettersPost(fakeReq({ body: { documentId: 'd1', type: 'billing_dispute' } }), paramsFor('c1'))],
     ['letter GET', () => letterGet(fakeReq(), letterParams('c1', 'l1'))],
     ['letter PATCH', () => letterPatch(fakeReq({ body: { action: 'freeze' } }), letterParams('c1', 'l1'))],
+    ['denial GET', () => denialGet(fakeReq(), docParams('c1', 'd1'))],
+    ['denial POST', () => denialPost(fakeReq({ body: {} }), docParams('c1', 'd1'))],
+    ['denial letter POST', () => lettersPost(fakeReq({ body: { documentId: 'd1', type: 'insurer_appeal', name: 'Rosa Fairbairn' } }), paramsFor('c1'))],
   ];
   for (const [name, call] of routes) await expect401(`${name}: unauthenticated -> 401`, call);
   // Everything below must stop before any data function runs.
   const touched: string[] = [];
   const spy = (n: string, v: unknown = null) => (async () => { touched.push(n); return v; }) as any;
-  const data = { getCaseDocument: spy('getCaseDocument'), confirmAndReview: spy('confirmAndReview'), createLetter: spy('createLetter'), getLetter: spy('getLetter'), editLetter: spy('editLetter'), freezeLetter: spy('freezeLetter') };
+  const data = { getCaseDocument: spy('getCaseDocument'), confirmAndReview: spy('confirmAndReview'), createLetter: spy('createLetter'), getLetter: spy('getLetter'), editLetter: spy('editLetter'), freezeLetter: spy('freezeLetter'), confirmDenial: spy('confirmDenial'), getDenialView: spy('getDenialView'), createDenialLetter: spy('createDenialLetter') };
   for (const [name, call] of routes) {
     touched.length = 0;
     stub({ ...asA, ...data, canAccessCase: (async () => false) as any });
@@ -565,8 +569,8 @@ async function billPath() {
     stub({ ...asA, ...data, canAccessCase: (async () => true) as any });
     const res = await call();
     restore();
-    const expected = name === 'letters POST' || name === 'confirm POST' || name === 'confirm GET' ? 'getCaseDocument' : name === 'letter PATCH' ? 'freezeLetter' : 'getLetter';
-    check(`${name}: own case, missing row -> 404 after the case check`, res.status === 404 && touched[0] === expected && !touched.includes('confirmAndReview') && !touched.includes('createLetter'), `status ${res.status} touched ${touched.join(',')}`);
+    const expected = ['letters POST', 'confirm POST', 'confirm GET', 'denial GET', 'denial POST', 'denial letter POST'].includes(name) ? 'getCaseDocument' : name === 'letter PATCH' ? 'freezeLetter' : 'getLetter';
+    check(`${name}: own case, missing row -> 404 after the case check`, res.status === 404 && touched[0] === expected && !touched.some((t) => ['confirmAndReview', 'createLetter', 'confirmDenial', 'createDenialLetter', 'getDenialView'].includes(t)), `status ${res.status} touched ${touched.join(',')}`);
   }
   {
     let reviewed: unknown = null;
@@ -579,9 +583,26 @@ async function billPath() {
   }
   {
     stub({ ...asA, canAccessCase: (async () => true) as any });
-    const res = await lettersPost(fakeReq({ body: { documentId: 'd1', type: 'insurer_appeal' } }), paramsFor('c1'));
+    const res = await lettersPost(fakeReq({ body: { documentId: 'd1', type: 'love_letter' } }), paramsFor('c1'));
     restore();
-    check('letters POST: only bill letter types are written from a bill (400)', res.status === 400);
+    check('letters POST: an unknown letter type is refused (400)', res.status === 400);
+  }
+  {
+    // Denials: a malformed confirmation never reaches the rules engine; a
+    // valid one is reviewed as the session user, on this case and document.
+    let reviewed: unknown = null;
+    let wrote: unknown = null;
+    stub({ ...asA, canAccessCase: (async () => true) as any, getCaseDocument: (async () => ({ id: 'd1' })) as any, confirmDenial: (async (uid: string, cid: string, did: string) => { reviewed = { uid, cid, did }; return {}; }) as any, createDenialLetter: (async (uid: string, cid: string, did: string, type: string, p: { name: string }) => { wrote = { uid, cid, did, type, name: p.name }; return { id: 'l1' }; }) as any });
+    const bad = await denialPost(fakeReq({ body: { planFunding: 'cadillac', noticeDate: '2026-03-02' } }), docParams('c1', 'd1'));
+    const badReviewed = reviewed;
+    const good = await denialPost(fakeReq({ body: { planFunding: 'fully_insured', category: 'medical_necessity', noticeDate: '2026-03-02', carcCodes: ['50'] } }), docParams('c1', 'd1'));
+    const noName = await lettersPost(fakeReq({ body: { documentId: 'd1', type: 'insurer_appeal' } }), paramsFor('c1'));
+    const named = await lettersPost(fakeReq({ body: { documentId: 'd1', type: 'insurer_appeal', name: 'Rosa Fairbairn' } }), paramsFor('c1'));
+    restore();
+    check('denial POST: a malformed confirmation is refused (400) before the rules run', bad.status === 400 && badReviewed === null);
+    check('denial POST: a valid confirmation is reviewed as the session user, on this case and document', good.status === 200 && JSON.stringify(reviewed) === JSON.stringify({ uid: A, cid: 'c1', did: 'd1' }), JSON.stringify(reviewed));
+    check("denial letter POST: the patient's name is required (400)", noName.status === 400);
+    check('denial letter POST: written as the session user, on this case and document', named.status === 201 && JSON.stringify(wrote) === JSON.stringify({ uid: A, cid: 'c1', did: 'd1', type: 'insurer_appeal', name: 'Rosa Fairbairn' }), JSON.stringify(wrote));
   }
 }
 

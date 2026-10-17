@@ -76,7 +76,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/035_denial_data.sql` → `db/036_policy_documents.sql`
 → `db/037_program_card_details.sql` → `db/038_bill_review.sql`
 → `db/039_bill_reference_data.sql` → `db/040_bill_rights_checks.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–040
+→ `db/041_denial_engine.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–041
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -202,8 +203,42 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   `refsUsd` / db/040 `ref_amounts_usd` so letters pass grounding), and
   nonprofit hospital financial assistance (240-day application window).
   All "ask", never assumed; coverage comes from the case subject as in
-  chat. Test: test_bill_rights. Pending: appeal and records letters (they
-  come with the denial flow).
+  chat. Test: test_bill_rights.
+- The real denial path (Phase 5, 2026-10-17; spec Appendix B4; rule
+  quotes in docs/research/denial_rules_verification.md, eCFR current to
+  2026-10-15). Pure engine in `lib/rules/denials/`: `rules.ts` (registry
+  with citations, deadlines per plan type: employer/marketplace 180 days
+  and external review four months by the 147.136 calendar rule; Part D
+  and Medicare Advantage 5 presumed days + 60; Medicaid plan 60, fair
+  hearing 90 to 120, state Medicaid left to the notice; plan decision
+  limits for `insurer_late`), `checks.ts` (the spec A3 checks plus
+  medical necessity, excluded service and external review), `parse.ts`
+  (denial text -> draft, no model; the layout parser keeps `text` for
+  denial letters and EOBs), `confirm.ts` (the ONLY ConfirmedDenial
+  constructor: nothing runs on unconfirmed data), `arguments.ts` (appeal
+  points; Medicare Advantage cites a Medicare coverage rule only when it
+  lists the exact code, 42 CFR 422.101(b)), `codes.ts` (CARC/RARC numbers
+  only; category words always shown; per-code wording in db/041
+  `denial_codes` stays hidden until the owner sets `explanation_status =
+  'approved'`). Letters: `lib/letters/denialTemplates.ts` (appeal /
+  redetermination / reconsideration, external review, claim file,
+  specific reason, Part D exception, and the request to the doctor for a
+  letter and records; `denialLetterProblems` proves every number, date
+  and code comes from the record or a rule and that no clinical judgment
+  is written). Safety rules: a window that runs from receipt is counted
+  from the date ON the notice; a shorter window stated in the letter
+  wins. `lib/deadlines.ts` (older payer-specific rules, unverified) is
+  not used by the denial path. Data: `lib/production/denialReview.ts`,
+  route `cases/[id]/documents/[docId]/denial` (403 in DEMO_MODE), denial
+  letters through `cases/[id]/letters` (the patient types the name).
+  Screen: `app/cases/[id]/DenialReview.tsx` ("Who pays your claims?").
+  db/041: denials, denial_codes, rules (mirror of the registry, test
+  proves they match), appeal_outcomes; deadlines and letters gain
+  denial_id. Tests: test_denial_rules, test_denials, eval_denials (graded
+  cases via `--cases`), e2e `scripts/synth_docs/e2e_denials.ts`, live
+  `smoke_denial_review.mjs`. Not built: state rules, Medicare levels 3
+  to 5, marketplace prior authorization (45 CFR 156.223), federal
+  holidays, the B4 legal notice and chat legal-scope items.
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure

@@ -44,7 +44,7 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   const { data: userCases } = await sb.from('cases').select('id').eq('user_id', userId);
   const caseIds = (userCases ?? []).map((c) => c.id);
   if (caseIds.length > 0) {
-    for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
+    for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'appeal_outcomes', 'denials', 'escalations', 'case_outcomes']) {
       await del(child, (q) => q.in('case_id', caseIds));
     }
   }
@@ -63,7 +63,7 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
       .in('managed_patient_id', managedIds);
     const managedCaseIds = (managedCases ?? []).map((c) => c.id);
     if (managedCaseIds.length > 0) {
-      for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'escalations', 'case_outcomes']) {
+      for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'appeal_outcomes', 'denials', 'escalations', 'case_outcomes']) {
         await del(child, (q) => q.in('case_id', managedCaseIds));
       }
       // Sessions riding on managed cases (keyed by case_id, in case the
@@ -84,6 +84,8 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   for (const table of [
     'letters',
     'bill_audit_findings',
+    'appeal_outcomes',
+    'denials',
     'uploaded_documents',
     'denial_appeals',
     'output_documents',

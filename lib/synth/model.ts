@@ -220,14 +220,21 @@ export interface SynthDenial {
   letterDate: string;
   service: string;
   code: string;
-  reason: string;
+  reason: string | null;            // null: the letter gives no reason
   appealDays: number;
+  // Phase 5 ground truth (picked after the fields above, so older fields keep their values).
+  planFunding: 'fully_insured' | 'self_funded' | 'marketplace' | 'medicare_advantage' | 'medicaid';
+  planLine: string;
+  carc: string | null;
+  claimNumber: string;
+  serviceDate: string;
+  category: 'medical_necessity' | 'no_prior_authorization' | 'excluded_service' | 'administrative' | 'no_reason_given';
 }
 
 export function makeDenial(seed: number): SynthDenial {
   const r = rng(seed * 104729);
   const s = r.pick(SERVICES.filter((x) => x.kind === 'img' || x.kind === 'proc'));
-  return {
+  const d = {
     id: `denial-${seed}`,
     docType: 'denial_letter',
     memberName: `${r.pick(FIRST)} ${r.pick(LAST)}`,
@@ -242,6 +249,28 @@ export function makeDenial(seed: number): SynthDenial {
       'We did not receive the information we asked for.',
     ]),
     appealDays: r.pick([60, 180]),
+  } as SynthDenial;
+  const plans = [
+    ['fully_insured', 'Your plan is insured by Bluefin Health Plan through your employer.'],
+    ['self_funded', "Your employer's plan is self-funded. We are the claims administrator for your employer."],
+    ['marketplace', 'You bought this individual plan through the Marketplace.'],
+    ['medicare_advantage', 'This is a Medicare Advantage plan. This notice is our organization determination.'],
+    ['medicaid', 'This is your Medicaid health plan.'],
+  ] as const;
+  const [planFunding, planLine] = r.pick([...plans]);
+  const reasons = ['medical_necessity', 'no_prior_authorization', 'excluded_service', 'administrative'] as const;
+  const category = reasons[['The records we received do not show that this service was medically necessary.', 'This service needed approval before it was done, and we did not receive a request.', 'This service is not covered under your plan.', 'We did not receive the information we asked for.'].indexOf(d.reason as string)];
+  const carc = r.pick([true, true, false]) ? ({ medical_necessity: '50', no_prior_authorization: '197', excluded_service: '96', administrative: '16' } as const)[category] : null;
+  const noReason = r.int(0, 4) === 0;
+  return {
+    ...d,
+    reason: noReason ? null : d.reason,
+    planFunding,
+    planLine,
+    carc: noReason ? null : carc,
+    claimNumber: `CL-${r.int(10, 99)}-${r.int(1000000, 9999999)}`,
+    serviceDate: addDays(d.letterDate, -r.int(10, 60)),
+    category: noReason ? 'no_reason_given' : category,
   };
 }
 

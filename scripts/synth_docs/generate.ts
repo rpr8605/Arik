@@ -136,9 +136,12 @@ async function renderDenial(d: SynthDenial, fontName: SynthBill['style']['font']
   text(page, formatDate(d.letterDate, 'MM/DD/YYYY'), 40, 90, reg, 10);
   text(page, `Dear ${d.memberName},`, 40, 120, reg, 11);
   const body = [
+    `Claim number: ${d.claimNumber}    Date of service: ${formatDate(d.serviceDate, 'MM/DD/YYYY')}`,
     `We reviewed the request for: ${d.service} (code ${d.code}).`,
     'Our decision: we are not able to approve this request.',
-    `Reason: ${d.reason}`,
+    ...(d.reason ? [`Reason: ${d.reason}`] : []),
+    ...(d.carc ? [`Reason code: CO-${d.carc}`] : []),
+    d.planLine,
     `You have the right to appeal. Your appeal must reach us within ${d.appealDays} days of the date of this letter.`,
     'If we uphold our decision, you may ask for an independent external review.',
   ];

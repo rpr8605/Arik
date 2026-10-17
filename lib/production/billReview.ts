@@ -13,11 +13,12 @@ import { coverageFrom } from '../rules/cashVsInsurance';
 import type { BillSituation } from '../rules/bills/rights';
 import { codeLetterDrafter, modelLetterDrafter } from './real/letterDrafter';
 import type { ConfirmedBill, Finding, LetterType } from './types';
+import type { DenialLetterType } from '../rules/denials/types';
 
 export interface StoredLetter {
   id: string;
   case_id: string;
-  letter_type: LetterType;
+  letter_type: LetterType | DenialLetterType;
   version: number;
   subject: string;
   body: string;

@@ -66,6 +66,7 @@ export interface ExtractedDocument {
   lines: ExtractedLine[];
   reader: string;             // which Extractor produced it
   textChars: number;          // how much text the reader found
+  text?: string;              // the page text, row by row: kept for denial letters and EOBs (lib/rules/denials/parse.ts reads it)
 }
 
 export interface Extractor {
