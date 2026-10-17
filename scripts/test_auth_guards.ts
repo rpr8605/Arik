@@ -36,6 +36,12 @@ import { GET as rxGet } from '../app/api/demo/rx/route';
 import { GET as confirmGet, POST as confirmPost } from '../app/api/cases/[id]/documents/[docId]/confirm/route';
 import { POST as lettersPost } from '../app/api/cases/[id]/letters/route';
 import { GET as denialGet, POST as denialPost } from '../app/api/cases/[id]/documents/[docId]/denial/route';
+import { GET as authzGet, POST as authzPost, DELETE as authzDelete } from '../app/api/authorization/route';
+import { GET as signGet, POST as signPost } from '../app/api/cases/[id]/letters/[letterId]/sign/route';
+import { GET as jobsGet, POST as jobsPost } from '../app/api/cases/[id]/jobs/route';
+import { POST as jobPost } from '../app/api/cases/[id]/jobs/[jobId]/route';
+import { POST as replyAddPost } from '../app/api/cases/[id]/jobs/[jobId]/replies/route';
+import { POST as replyDecidePost } from '../app/api/cases/[id]/replies/[replyId]/route';
 import { GET as letterGet, PATCH as letterPatch } from '../app/api/cases/[id]/letters/[letterId]/route';
 
 let failures = 0;
@@ -606,9 +612,73 @@ async function billPath() {
   }
 }
 
+// Agent actions (Phase 6): authorization, signing, sends, replies.
+async function agentActions() {
+  const asA = { getUserId: (async () => A) as any, isDemoMode: () => false };
+  const p2 = (id: string, k: string, v: string) => ({ params: Promise.resolve({ id, [k]: v }) }) as any;
+  const sendBody = { letterId: 'l1', channel: 'fax', recipientName: 'Bluefin Health Plan Appeals', fax: '(555) 555-0142' };
+  const caseRoutes: [string, () => Promise<Response>][] = [
+    ['sign GET', () => signGet(fakeReq(), p2('c1', 'letterId', 'l1'))],
+    ['sign POST', () => signPost(fakeReq({ body: { name: 'Rosa Fairbairn', signature: 'x' } }), p2('c1', 'letterId', 'l1'))],
+    ['jobs GET', () => jobsGet(fakeReq(), paramsFor('c1'))],
+    ['jobs POST', () => jobsPost(fakeReq({ body: sendBody }), paramsFor('c1'))],
+    ['job approve POST', () => jobPost(fakeReq({ body: { action: 'approve' } }), p2('c1', 'jobId', 'j1'))],
+    ['reply add POST', () => replyAddPost(fakeReq({ body: { practice: 'approved' } }), p2('c1', 'jobId', 'j1'))],
+    ['reply decide POST', () => replyDecidePost(fakeReq({ body: { decision: 'approve' } }), p2('c1', 'replyId', 'r1'))],
+  ];
+  const userRoutes: [string, () => Promise<Response>][] = [
+    ['authorization GET', () => authzGet(fakeReq())],
+    ['authorization POST', () => authzPost(fakeReq({ body: { name: 'Rosa Fairbairn', signature: 'x' } }))],
+    ['authorization DELETE', () => authzDelete(fakeReq())],
+  ];
+  for (const [name, call] of [...caseRoutes, ...userRoutes]) await expect401(`${name}: unauthenticated -> 401`, call);
+  const touched: string[] = [];
+  const spy = (n: string, v: unknown = { error: 'x', status: 409 }) => (async () => { touched.push(n); return v; }) as any;
+  const data = { getAuthorization: spy('getAuthorization', {}), signAuthorization: spy('signAuthorization'), revokeAuthorization: spy('revokeAuthorization', false), authorizationPdfFor: spy('authorizationPdfFor', null), signLetter: spy('signLetter'), signedLetterFile: spy('signedLetterFile', null), prepareSend: spy('prepareSend'), approveSend: spy('approveSend'), cancelSend: spy('cancelSend'), listJobs: spy('listJobs', { jobs: [] }), addReply: spy('addReply'), decideReply: spy('decideReply') };
+  for (const [name, call] of caseRoutes) {
+    touched.length = 0;
+    stub({ ...asA, ...data, canAccessCase: (async () => false) as any });
+    const res = await call();
+    restore();
+    check(`${name}: B's case -> 404, nothing touched`, res.status === 404 && touched.length === 0, `status ${res.status} touched ${touched.join(',')}`);
+  }
+  for (const [name, call] of [...caseRoutes, ...userRoutes]) {
+    touched.length = 0;
+    stub({ ...asA, ...data, isDemoMode: () => true, canAccessCase: (async () => true) as any });
+    const res = await call();
+    restore();
+    check(`${name}: DEMO_MODE on -> 403 (the demo is scripted)`, res.status === 403 && touched.length === 0, `status ${res.status}`);
+  }
+  {
+    // Inputs are checked before any data function runs, and every call is
+    // made as the session user on this case.
+    let seen: unknown = null;
+    stub({ ...asA, ...data, canAccessCase: (async () => true) as any, prepareSend: (async (uid: string, cid: string, r: any) => { seen = { uid, cid, channel: r.channel }; return { job: { id: 'j1' }, summary: {} }; }) as any, approveSend: (async (uid: string, cid: string, jid: string) => { seen = { uid, cid, jid }; return { job: { id: jid } }; }) as any });
+    const noFax = await jobsPost(fakeReq({ body: { ...sendBody, fax: 'call me' } }), paramsFor('c1'));
+    const noAddr = await jobsPost(fakeReq({ body: { letterId: 'l1', channel: 'mail', recipientName: 'Billing office' } }), paramsFor('c1'));
+    const touchedBad = touched.length;
+    const good = await jobsPost(fakeReq({ body: sendBody }), paramsFor('c1'));
+    const goodSeen = JSON.stringify(seen);
+    const badAction = await jobPost(fakeReq({ body: { action: 'send-anyway' } }), p2('c1', 'jobId', 'j1'));
+    const approve = await jobPost(fakeReq({ body: { action: 'approve' } }), p2('c1', 'jobId', 'j1'));
+    const noName = await authzPost(fakeReq({ body: { name: '', signature: 'x' } }));
+    const badDecision = await replyDecidePost(fakeReq({ body: { decision: 'send' } }), p2('c1', 'replyId', 'r1'));
+    const noSrc = await replyAddPost(fakeReq({ body: {} }), p2('c1', 'jobId', 'j1'));
+    restore();
+    check('jobs POST: a bad fax number or a missing address is refused (400) before anything runs', noFax.status === 400 && noAddr.status === 400 && touchedBad === 0);
+    check('jobs POST: prepared as the session user on this case (nothing sent)', good.status === 201 && goodSeen === JSON.stringify({ uid: A, cid: 'c1', channel: 'fax' }), goodSeen);
+    check("job POST: only 'approve' or 'cancel' (400 otherwise)", badAction.status === 400);
+    check('job approve: runs as the session user, on this case and job', approve.status === 200 && JSON.stringify(seen) === JSON.stringify({ uid: A, cid: 'c1', jid: 'j1' }), JSON.stringify(seen));
+    check('authorization POST: a name is required (400)', noName.status === 400);
+    check('reply decide: only approve, dismiss or reclassify (400)', badDecision.status === 400);
+    check('reply add: a document or a practice kind is required (400)', noSrc.status === 400);
+  }
+}
+
 main()
   .then(() => demoSamples())
   .then(() => billPath())
+  .then(() => agentActions())
   .then(() => {
     console.log(failures === 0 ? '\nAUTH GUARDS: ALL PASS' : `\nAUTH GUARDS: ${failures} FAILURE(S)`);
     process.exit(failures === 0 ? 0 : 1);

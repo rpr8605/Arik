@@ -76,8 +76,8 @@ Apply order on a fresh project: `schema.sql` → `db/002_identity_crypto.sql`
 → `db/035_denial_data.sql` → `db/036_policy_documents.sql`
 → `db/037_program_card_details.sql` → `db/038_bill_review.sql`
 → `db/039_bill_reference_data.sql` → `db/040_bill_rights_checks.sql`
-→ `db/041_denial_engine.sql`
-(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–041
+→ `db/041_denial_engine.sql` → `db/042_agent_actions.sql`
+(or `scripts/apply_db.mjs` then `scripts/run_sql.mjs` for 004+; 006–042
 are idempotent). **Local CLI stack one-command build: `npm run db:reset`**
 (scripts/db_reset.mjs; loopback hosts only) — order is schema.sql → seed
 scripts → db/0*.sql, because several migrations patch seeded rows by
@@ -239,6 +239,36 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   `smoke_denial_review.mjs`. Not built: state rules, Medicare levels 3
   to 5, marketplace prior authorization (45 CFR 156.223), federal
   holidays, the B4 legal notice and chat legal-scope items.
+- Agent actions (Phase 6, 2026-10-17; plan docs/kimi/PLAN_PHASE_6.md).
+  Pure in `lib/actions/`: `registry.ts` (every action's tier, patient-only
+  steps, requirements; `canRun()` is the one gate: sign/attest/pay/opt-in
+  impossible without the patient, nothing leaves without approval, Tier 3
+  never), `authorization.ts` (one-time authorization, text is a
+  PLACEHOLDER for counsel, versioned and hashed; finger signature PNG with
+  an ink check via sharp; signed letter = frozen text + signature, PDF
+  dates pinned to the signing time so a rebuilt copy matches its stored
+  hash), `senders.ts` (`FaxSender`/`MailSender`; demo executors =
+  "Practice send", nothing leaves; any `SEND_EXECUTOR` other than demo
+  gets refusing stubs until a vendor that signed a BAA exists),
+  `tracker.ts` (reply deadlines only from verified rules, counted from the
+  delivery date: appeal decision limits from Phase 5, external review 45
+  days; none for bill letters and requests; overdue), `replies.ts`
+  (classify approved / denied again / info requested / collections notice
+  / corrected bill / unknown, propose the next step; approving drafts a
+  letter at most), `notify.ts` (no health details; no delivery channel
+  yet), `syntheticReplies.ts`. Data: `lib/production/actions.ts`
+  (approvals ledgered as `agent_authorization` / `agent_action`; no IP or
+  device data anywhere). Routes: `authorization`, `cases/[id]/letters/
+  [letterId]/sign`, `cases/[id]/jobs`, `cases/[id]/jobs/[jobId]`,
+  `.../jobs/[jobId]/replies`, `cases/[id]/replies/[replyId]` (all 403 in
+  DEMO_MODE). Screens: `SendFlow.tsx` (under a frozen letter),
+  `SignaturePad.tsx`, `Tracker.tsx` (case page). db/042:
+  agent_authorizations, letter_signatures, send_jobs, send_job_events
+  (append-only trigger), case_inbound_numbers, replies. The privacy
+  cascade skips a table a database does not have yet (PGRST205/42P01).
+  Tests: test_actions, test_tracker, test_replies, auth guards, live
+  `smoke_agent_actions.mjs`. Gated: real fax/mail/e-sign vendors (BAA),
+  counsel's authorization text, notification delivery, inbound webhooks.
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure

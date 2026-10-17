@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { SendFlow } from './SendFlow';
 import type { DenialView } from '@/lib/production/denialReview';
 import type { DenialDraft } from '@/lib/rules/denials/parse';
 
@@ -306,6 +307,7 @@ export function DenialReview({ caseId, documentId }: { caseId: string; documentI
             <button type="button" style={big} disabled={busy} onClick={freezeAndDownload}>{letter.status === 'draft' ? 'Save final copy and download PDF' : 'Download PDF'}</button>
             <button type="button" style={big} onClick={() => setLetter(null)}>Back to what I found</button>
           </div>
+          {letter.status === 'frozen' && <SendFlow caseId={caseId} letterId={letter.id} />}
         </div>
       )}
       {error && <p role="alert">{error}</p>}

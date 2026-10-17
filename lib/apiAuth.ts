@@ -48,6 +48,7 @@ import { isDemoMode } from './demo/samples';
 import { loadRxOptions } from './demo/rxOptions';
 import { confirmAndReview, createLetter, editLetter, freezeLetter, getCaseDocument, getLetter } from './production/billReview';
 import { confirmDenial, createDenialLetter, getDenialView } from './production/denialReview';
+import { addReply, approveSend, authorizationPdfFor, cancelSend, decideReply, getAuthorization, listJobs, prepareSend, revokeAuthorization, signAuthorization, signedLetterFile, signLetter } from './production/actions';
 
 export const apiDeps = {
   getUserId,
@@ -106,6 +107,20 @@ export const apiDeps = {
   confirmDenial,
   getDenialView,
   createDenialLetter,
+  // Agent actions (Phase 6, lib/production/actions.ts): authorization,
+  // signing, sends, the tracker and replies.
+  getAuthorization,
+  signAuthorization,
+  revokeAuthorization,
+  authorizationPdfFor,
+  signLetter,
+  signedLetterFile,
+  prepareSend,
+  approveSend,
+  cancelSend,
+  listJobs,
+  addReply,
+  decideReply,
 };
 
 export function unauthorized() {

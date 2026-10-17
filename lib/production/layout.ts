@@ -236,5 +236,5 @@ export function parseDocument(words: Word[], reader: string): ExtractedDocument 
       box: r.box,
     });
   }
-  return { docType, header, lines, reader, textChars: all.replace(/\s/g, '').length, ...(docType === 'denial_letter' || docType === 'eob' ? { text: all } : {}) };
+  return { docType, header, lines, reader, textChars: all.replace(/\s/g, '').length, text: all };
 }

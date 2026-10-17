@@ -18,6 +18,12 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   // tables keyed by user_id (user_style_prefs has no id column).
   async function del(table: string, filter: (q: any) => any, key = 'id') {
     const { data, error } = await filter(sb.from(table).delete()).select(key);
+    // A table a database does not have yet (a migration not applied there)
+    // holds none of this user's data: nothing to delete, keep going.
+    if (error && (error.code === 'PGRST205' || error.code === '42P01')) {
+      deleted[table] = deleted[table] ?? 0;
+      return;
+    }
     if (error) throw new Error(`${table}: ${error.message}`);
     deleted[table] = (deleted[table] ?? 0) + (data?.length ?? 0);
   }
@@ -44,8 +50,8 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   const { data: userCases } = await sb.from('cases').select('id').eq('user_id', userId);
   const caseIds = (userCases ?? []).map((c) => c.id);
   if (caseIds.length > 0) {
-    for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'appeal_outcomes', 'denials', 'escalations', 'case_outcomes']) {
-      await del(child, (q) => q.in('case_id', caseIds));
+    for (const child of ['replies', 'send_job_events', 'send_jobs', 'letter_signatures', 'case_inbound_numbers', 'letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'appeal_outcomes', 'denials', 'escalations', 'case_outcomes']) {
+      await del(child, (q) => q.in('case_id', caseIds), child === 'case_inbound_numbers' ? 'case_id' : 'id');
     }
   }
 
@@ -63,8 +69,8 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
       .in('managed_patient_id', managedIds);
     const managedCaseIds = (managedCases ?? []).map((c) => c.id);
     if (managedCaseIds.length > 0) {
-      for (const child of ['letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'appeal_outcomes', 'denials', 'escalations', 'case_outcomes']) {
-        await del(child, (q) => q.in('case_id', managedCaseIds));
+      for (const child of ['replies', 'send_job_events', 'send_jobs', 'letter_signatures', 'case_inbound_numbers', 'letters', 'bill_audit_findings', 'case_referrals', 'deadlines', 'appeal_outcomes', 'denials', 'escalations', 'case_outcomes']) {
+        await del(child, (q) => q.in('case_id', managedCaseIds), child === 'case_inbound_numbers' ? 'case_id' : 'id');
       }
       // Sessions riding on managed cases (keyed by case_id, in case the
       // session's user_id differs) before those cases go.
@@ -82,6 +88,11 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
   // Findings and letters point at uploaded documents (and a frozen letter
   // refuses the update a "set null" would make), so they go first.
   for (const table of [
+    'replies',
+    'send_jobs',
+    'letter_signatures',
+    'case_inbound_numbers',
+    'agent_authorizations',
     'letters',
     'bill_audit_findings',
     'appeal_outcomes',
@@ -92,7 +103,7 @@ export async function deleteAllUserData(userId: string): Promise<Record<string, 
     'mtm_eligibility_checks',
     'user_medications',
   ]) {
-    await del(table, (q) => q.eq('user_id', userId));
+    await del(table, (q) => q.eq('user_id', userId), table === 'case_inbound_numbers' ? 'case_id' : 'id');
   }
   await del('shared_reviews', (q) => q.eq('owner_user_id', userId));
   if (caseIds.length > 0) {

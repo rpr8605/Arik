@@ -24,10 +24,19 @@ function encodable(font: { encodeText(t: string): unknown }, text: string) {
   return out;
 }
 
-export async function letterPdf(l: Pick<DraftLetter, 'subject' | 'body' | 'footer'>, dateLine: string): Promise<Uint8Array> {
+// `signature` (Phase 6): the patient's signature image and a "Signed
+// electronically" line, drawn right after the letter text. The text, and
+// so the frozen hash, is unchanged.
+export async function letterPdf(l: Pick<DraftLetter, 'subject' | 'body' | 'footer'>, dateLine: string, signature?: { png: Uint8Array; line: string; at: Date }): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(l.subject);
   doc.setProducer('Arik Health');
+  // A signed copy is rebuilt and checked against its stored hash, so its
+  // bytes must not depend on when it is rendered.
+  if (signature) {
+    doc.setCreationDate(signature.at);
+    doc.setModificationDate(signature.at);
+  }
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const W = 612;
@@ -75,6 +84,19 @@ export async function letterPdf(l: Pick<DraftLetter, 'subject' | 'body' | 'foote
   for (const para of l.body.split('\n\n')) {
     write(para);
     y -= lead / 2;
+  }
+  if (signature) {
+    const img = await doc.embedPng(signature.png);
+    const scale = Math.min(200 / img.width, 60 / img.height, 1);
+    const h = img.height * scale;
+    if (y - h - lead < M + 20) {
+      page = doc.addPage([W, H]);
+      footer();
+      y = H - M;
+    }
+    page.drawImage(img, { x: M, y: y - h, width: img.width * scale, height: h });
+    y -= h + lead / 2;
+    write(signature.line, font, 9);
   }
   return doc.save();
 }

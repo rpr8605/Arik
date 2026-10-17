@@ -10,6 +10,7 @@ import { loadCaseCards } from '@/lib/caseCards';
 import { hasConfirmedOutcome, shouldPromptOutcomeConfirmation } from '@/lib/outcomes';
 import { Thread } from './Thread';
 import { OutcomePrompt } from './OutcomePrompt';
+import { Tracker } from './Tracker';
 
 export default async function CasePage({
   params,
@@ -87,6 +88,7 @@ export default async function CasePage({
         </p>
       ) : null}
       {showOutcomePrompt ? <OutcomePrompt caseId={id} /> : null}
+      {!sample && !isDemoMode() ? <Tracker caseId={id} /> : null}
       {session ? (
         <Thread
           sessionId={session.id}

@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { SendFlow } from './SendFlow';
 import type { ExtractedDocument, Finding } from '@/lib/production/types';
 
 type Line = { date: string; code: string; description: string; units: string; chargeUsd: string };
@@ -193,6 +194,7 @@ export function BillReview({ caseId, documentId, reading }: { caseId: string; do
             <button type="button" style={big} disabled={busy} onClick={freezeAndDownload}>{letter.status === 'draft' ? 'Save final copy and download PDF' : 'Download PDF'}</button>
             <button type="button" style={big} onClick={() => setLetter(null)}>Back to what I found</button>
           </div>
+          {letter.status === 'frozen' && <SendFlow caseId={caseId} letterId={letter.id} />}
         </div>
       )}
       {error && <p role="alert">{error}</p>}
