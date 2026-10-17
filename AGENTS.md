@@ -269,6 +269,22 @@ phase list conflicts with HANDOFF.md's build sequence, HANDOFF wins.
   Tests: test_actions, test_tracker, test_replies, auth guards, live
   `smoke_agent_actions.mjs`. Gated: real fax/mail/e-sign vendors (BAA),
   counsel's authorization text, notification delivery, inbound webhooks.
+- Patient home P1 (Phase 7, 2026-10-17; design docs/design/patient_home_*):
+  pure `lib/home/compose.ts` (status chips in words, Needs you soonest
+  first, Saved so far from the latest PATIENT-CONFIRMED outcome per case
+  only, monthly savings never multiplied by a guessed duration, "possible"
+  on its own labeled line, Coming up, the job timeline composed from
+  existing rows newest first, the documents list), loader
+  `lib/home/load.ts` (own and managed patients' cases via listCases,
+  never samples; read-only, no new tables). Routes `api/home`,
+  `api/jobs`, `api/jobs/[id]`, `api/documents` (403 in DEMO_MODE). Pages
+  `/home`, `/jobs`, `/jobs/[id]`, `/docs` with `app/home/BottomNav.tsx`; in
+  DEMO_MODE they point to the sample patients (demo unchanged). Frozen
+  letter PDFs pin their dates to the freeze time, so a re-download is
+  byte-identical. Not counted yet: savings on purged cases
+  (`case_summaries` does not record patient confirmation). Tests:
+  test_home, auth guards, live `smoke_patient_home.mjs`. P2 (profile,
+  privacy center) and P3 (savings confirmation flow, employer rollup) next.
 - `lib/` — core infrastructure modules (built 2026-07-24):
   - `cases.ts` — case CRUD + status workflow; illegal transitions throw
     (`IllegalTransitionError` → 409 at the API layer). Guard is the pure

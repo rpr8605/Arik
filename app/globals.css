@@ -1635,3 +1635,18 @@ main.hiccup {
 main.hiccup .actions {
   justify-content: center;
 }
+
+/* Patient home status chips (Phase 7 P1): words plus color, never color alone. */
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  background: #eef3f6;
+  color: #22425c;
+}
+.chip-needs_you { background: #fde7e1; color: #8a2f17; font-weight: 600; }
+.chip-arik_working { background: #e3f4f2; color: #0b5f5a; }
+.chip-waiting_on_them { background: #eef1f8; color: #2f3f73; }
+.chip-won { background: #e4f4e3; color: #245c22; font-weight: 600; }
+.chip-closed { background: #eceff1; color: #48525a; }

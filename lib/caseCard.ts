@@ -32,6 +32,11 @@ const TOPIC: Record<CaseType, string> = {
   charity_care: 'Hospital financial help',
 };
 
+// A job's topic in plain words (patient home, Phase 7).
+export function caseTopic(caseType: string): string {
+  return TOPIC[(caseType in TOPIC ? caseType : 'prescription_savings') as CaseType];
+}
+
 const HAPPENING: Record<CaseStatus, (type: CaseType) => string> = {
   gathering_evidence: (type) =>
     type === 'prescription_savings' ? 'Arik is still checking prices.' : 'Arik is still looking into it.',

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   if (req.nextUrl.searchParams.get('format') !== 'pdf') return NextResponse.json({ letter });
   if (letter.status !== 'frozen') return NextResponse.json({ error: 'freeze the letter before downloading it' }, { status: 409 });
   if (letterHash(letter) !== letter.content_sha256) return NextResponse.json({ error: 'the stored letter no longer matches its frozen copy' }, { status: 500 });
-  const pdf = await letterPdf(letter, letterDateLine(letter.frozen_at!.slice(0, 10)));
+  const pdf = await letterPdf(letter, letterDateLine(letter.frozen_at!.slice(0, 10)), undefined, new Date(letter.frozen_at!));
   return new NextResponse(Buffer.from(pdf), {
     headers: { 'content-type': 'application/pdf', 'content-disposition': `attachment; filename="letter-${letter.letter_type}-v${letter.version}.pdf"`, 'cache-control': 'private, no-store' },
   });

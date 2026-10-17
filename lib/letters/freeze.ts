@@ -27,15 +27,16 @@ function encodable(font: { encodeText(t: string): unknown }, text: string) {
 // `signature` (Phase 6): the patient's signature image and a "Signed
 // electronically" line, drawn right after the letter text. The text, and
 // so the frozen hash, is unchanged.
-export async function letterPdf(l: Pick<DraftLetter, 'subject' | 'body' | 'footer'>, dateLine: string, signature?: { png: Uint8Array; line: string; at: Date }): Promise<Uint8Array> {
+// `at` (the freeze or signing time) pins the PDF's dates: a frozen or
+// signed copy downloads byte-identical every time, so its hash holds.
+export async function letterPdf(l: Pick<DraftLetter, 'subject' | 'body' | 'footer'>, dateLine: string, signature?: { png: Uint8Array; line: string; at: Date }, at?: Date): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(l.subject);
   doc.setProducer('Arik Health');
-  // A signed copy is rebuilt and checked against its stored hash, so its
-  // bytes must not depend on when it is rendered.
-  if (signature) {
-    doc.setCreationDate(signature.at);
-    doc.setModificationDate(signature.at);
+  const fixed = signature?.at ?? at;
+  if (fixed) {
+    doc.setCreationDate(fixed);
+    doc.setModificationDate(fixed);
   }
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);

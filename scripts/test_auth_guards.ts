@@ -42,6 +42,10 @@ import { GET as jobsGet, POST as jobsPost } from '../app/api/cases/[id]/jobs/rou
 import { POST as jobPost } from '../app/api/cases/[id]/jobs/[jobId]/route';
 import { POST as replyAddPost } from '../app/api/cases/[id]/jobs/[jobId]/replies/route';
 import { POST as replyDecidePost } from '../app/api/cases/[id]/replies/[replyId]/route';
+import { GET as homeGet } from '../app/api/home/route';
+import { GET as jobsListGet } from '../app/api/jobs/route';
+import { GET as jobDetailGet } from '../app/api/jobs/[id]/route';
+import { GET as documentsGet } from '../app/api/documents/route';
 import { GET as letterGet, PATCH as letterPatch } from '../app/api/cases/[id]/letters/[letterId]/route';
 
 let failures = 0;
@@ -675,10 +679,47 @@ async function agentActions() {
   }
 }
 
+// Patient home (Phase 7 P1): read-only, the session user's cases only.
+async function patientHome() {
+  const asA = { getUserId: (async () => A) as any, isDemoMode: () => false };
+  const routes: [string, () => Promise<Response>][] = [
+    ['home GET', () => homeGet(fakeReq())],
+    ['jobs list GET', () => jobsListGet(fakeReq())],
+    ['job detail GET', () => jobDetailGet(fakeReq(), paramsFor('c1'))],
+    ['documents GET', () => documentsGet(fakeReq())],
+  ];
+  for (const [name, call] of routes) await expect401(`${name}: unauthenticated -> 401`, call);
+  const seen: string[] = [];
+  const data = { loadHome: (async (u: string) => { seen.push(`home:${u}`); return {}; }) as any, loadJobs: (async (u: string) => { seen.push(`jobs:${u}`); return { jobs: [] }; }) as any, loadJob: (async (u: string, c: string) => { seen.push(`job:${u}:${c}`); return { job: {} }; }) as any, loadDocuments: (async (u: string) => { seen.push(`docs:${u}`); return { documents: [] }; }) as any };
+  for (const [name, call] of routes) {
+    seen.length = 0;
+    stub({ ...asA, ...data, isDemoMode: () => true, canAccessCase: (async () => true) as any });
+    const res = await call();
+    restore();
+    check(`${name}: DEMO_MODE on -> 403 (the demo has sample homes)`, res.status === 403 && seen.length === 0, `status ${res.status}`);
+  }
+  seen.length = 0;
+  stub({ ...asA, ...data, canAccessCase: (async () => false) as any });
+  const stranger = await jobDetailGet(fakeReq(), paramsFor('c1'));
+  restore();
+  check("job detail GET: B's job -> 404, nothing loaded", stranger.status === 404 && seen.length === 0, seen.join());
+  seen.length = 0;
+  stub({ ...asA, ...data, canAccessCase: (async () => true) as any, loadJob: (async () => null) as any });
+  const gone = await jobDetailGet(fakeReq(), paramsFor('c1'));
+  restore();
+  check('job detail GET: a job the loader cannot see -> the same 404', gone.status === 404);
+  seen.length = 0;
+  stub({ ...asA, ...data, canAccessCase: (async () => true) as any });
+  for (const [, call] of routes) await call();
+  restore();
+  check('home, jobs, job and documents all load as the session user only', JSON.stringify(seen) === JSON.stringify([`home:${A}`, `jobs:${A}`, `job:${A}:c1`, `docs:${A}`]), seen.join());
+}
+
 main()
   .then(() => demoSamples())
   .then(() => billPath())
   .then(() => agentActions())
+  .then(() => patientHome())
   .then(() => {
     console.log(failures === 0 ? '\nAUTH GUARDS: ALL PASS' : `\nAUTH GUARDS: ${failures} FAILURE(S)`);
     process.exit(failures === 0 ? 0 : 1);

@@ -44,6 +44,11 @@ export default async function Home() {
         {cases.length > 0 && (
           <>
             <h2>What you're working on</h2>
+            {!isDemoMode() && (
+              <p>
+                <Link href="/home">Your home: what needs you, what you saved, your documents</Link>
+              </p>
+            )}
             <ul className="case-list">
               {cases.map((c) => (
                 <li key={c.id}>

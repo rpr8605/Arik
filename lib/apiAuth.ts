@@ -48,6 +48,7 @@ import { isDemoMode } from './demo/samples';
 import { loadRxOptions } from './demo/rxOptions';
 import { confirmAndReview, createLetter, editLetter, freezeLetter, getCaseDocument, getLetter } from './production/billReview';
 import { confirmDenial, createDenialLetter, getDenialView } from './production/denialReview';
+import { loadDocuments, loadHome, loadJob, loadJobs } from './home/load';
 import { addReply, approveSend, authorizationPdfFor, cancelSend, decideReply, getAuthorization, listJobs, prepareSend, revokeAuthorization, signAuthorization, signedLetterFile, signLetter } from './production/actions';
 
 export const apiDeps = {
@@ -121,6 +122,12 @@ export const apiDeps = {
   listJobs,
   addReply,
   decideReply,
+  // Patient home (Phase 7 P1, lib/home/load.ts): read-only, the user's own
+  // and managed patients' cases only.
+  loadHome,
+  loadJobs,
+  loadJob,
+  loadDocuments,
 };
 
 export function unauthorized() {
